@@ -202,19 +202,15 @@ func (s *Store) SetMeta(key, value string) error {
 
 const crockford = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 
-// NewID returns a ULID-style sortable identifier: 48-bit ms timestamp +
-// 80 random bits, Crockford base32, lowercase (26 chars).
+// NewID returns a 128-bit random identifier in lowercase Crockford
+// base32 (26 chars). Deliberately not time-prefixed: short display
+// prefixes (8 chars) stay unique across same-millisecond writes, and
+// ordering lives in created_at, not the id.
 func NewID() string {
 	var b [16]byte
-	ms := uint64(time.Now().UnixMilli())
-	b[0] = byte(ms >> 40)
-	b[1] = byte(ms >> 32)
-	b[2] = byte(ms >> 24)
-	b[3] = byte(ms >> 16)
-	b[4] = byte(ms >> 8)
-	b[5] = byte(ms)
-	if _, err := rand.Read(b[6:]); err != nil {
-		binary.BigEndian.PutUint64(b[8:], uint64(time.Now().UnixNano()))
+	if _, err := rand.Read(b[:]); err != nil {
+		binary.BigEndian.PutUint64(b[:8], uint64(time.Now().UnixNano()))
+		binary.BigEndian.PutUint64(b[8:], uint64(time.Now().UnixMilli())^0x9e3779b97f4a7c15)
 	}
 	// 16 bytes = 128 bits -> 26 base32 chars (130 bits, top 2 padded).
 	dst := make([]byte, 26)

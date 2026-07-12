@@ -36,6 +36,9 @@ type Input struct {
 	Quarantine bool
 	// QuarantineReason recorded as a flag when Quarantine is set.
 	QuarantineReason string
+	// QuarantineFlagKind selects the review-inbox flag kind
+	// (default store.FlagTainted).
+	QuarantineFlagKind string
 	// Force bypasses a scan refusal in warn mode (secrets still redacted).
 	Force bool
 	// SkipScan is for trusted internal rewrites (consolidation date fixes).
@@ -165,12 +168,17 @@ func (w *Writer) Write(in Input) (*Outcome, error) {
 	}
 
 	// 4. Embed (nil embedder = lexical floor; belief falls back to token
-	// overlap).
+	// overlap). The first embedded write pins the model identity in meta;
+	// mixed-model stores are refused at open (§6).
 	var vec []float32
 	if w.Embedder != nil {
 		v, err := w.Embedder.Embed(content)
 		if err == nil {
 			vec = v
+			if pinned, _ := w.Store.GetMeta(store.MetaEmbeddingModel); pinned == "" {
+				_ = w.Store.SetMeta(store.MetaEmbeddingModel, w.Embedder.Name())
+				_ = w.Store.SetMeta(store.MetaEmbeddingDims, fmt.Sprint(w.Embedder.Dims()))
+			}
 		}
 	}
 
@@ -267,7 +275,11 @@ func (w *Writer) insert(in Input, content, memType string, ents []store.Entity, 
 		if reason == "" {
 			reason = "untrusted origin (trust tier T3)"
 		}
-		_ = w.Store.AddFlag(m.ID, store.FlagTainted, reason)
+		kind := in.QuarantineFlagKind
+		if kind == "" {
+			kind = store.FlagTainted
+		}
+		_ = w.Store.AddFlag(m.ID, kind, reason)
 		_ = w.Store.AppendOp(store.OpQuarantine, m.ID, map[string]any{"reason": reason})
 	}
 	return m, nil
