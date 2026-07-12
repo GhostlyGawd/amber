@@ -90,8 +90,12 @@ alongside each tagged release; we do not cherry-pick question types.
 
 The most common memory practice today is a static context file
 (AGENTS.md / CLAUDE.md) injected into every prompt, growing forever,
-reviewed by no one. ETH Zurich researchers put that practice to the
-test (the AGENTS.md study, arXiv:2602.11988) and found:
+reviewed by no one. ETH Zurich's SRI Lab put that practice to the
+test — *Evaluating AGENTS.md: Are Repository-Level Context Files
+Helpful for Coding Agents?* (Gloaguen, Mündler, Müller, Raychev,
+Vechev; [arXiv:2602.11988](https://arxiv.org/abs/2602.11988), v2 June
+2026; four agents, SWE-bench Lite plus a novel 138-task benchmark) —
+and found:
 
 - context files often did **not** improve task success;
 - they raised inference cost by **more than 20%** (the file rides
@@ -114,6 +118,27 @@ design rule Amber enforces:
 | Files ride along in every prompt, raising cost >20% | No budget, no relevance gate | Injection is **budgeted** (≤700 tokens, ~1% of a session), recalled per-query, visible in `status`, deduped against CLAUDE.md |
 | LLM-generated files hurt in 5 of 8 settings | Machine-written context that no human checked | Machine-extracted memories land in a **review inbox** — you approve, edit, or reject before they're ever injected |
 | Accumulated context doesn't improve success | Stale and contradictory entries never pruned | `consolidate` merges duplicates, resolves contradictions, and **retires stale memories from injection** (never from the store) |
+
+The same study contains the constructive half of the result: agents
+reliably **followed explicit instructions** in context files (invoking
+instructed tools at up to ~2.5× baseline), while descriptive
+repository overviews — "popular and recommended by model providers" —
+were the dead weight. Specific, actionable content earns its context
+window; encyclopedic content doesn't. That is why Amber's memory
+types are decisions, preferences, corrections, and facts — and why
+the briefing is small.
+
+Caveats we carry rather than hide: the study is a preprint;
+benchmarks are Python-heavy; two authors are affiliated with a
+coding-agent company; developer-written files showed marginal gains
+for some agents. And it studies *static context files*, not dynamic
+memory systems — strong, adjacent evidence for the rot failure mode,
+not a verdict on all memory. (On the dynamic side the evidence is
+split: GitHub's vendor-run A/B reports Copilot Memory lifting PR
+merge rates 83%→90%, self-reported with unpublished methodology,
+while the peer-reviewed LongMemEval — the benchmark we run above —
+measured ~30% multi-session recall drops in production assistants.
+See [problem-map.md](problem-map.md#the-efficacy-question-answered-honestly).)
 
 One honest consequence remains, and we accept it: if unreviewed
 context doesn't reliably improve task success, we will not promise

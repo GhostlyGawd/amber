@@ -129,9 +129,11 @@
   </div>
   <div class="pain">
     <h3><span class="k">The black box.</span> Vendor auto-memory isn't yours.</h3>
-    <p>It quietly writes things about you and your codebase into a store you
-    can't fully read, export, or audit — locked to one tool. And anything the
-    agent reads (tool output, a web page) can write into what it believes.</p>
+    <p>Every major coding agent now ships auto-memory with the same design:
+    <b>the agent decides what to save; you find out afterwards</b>. The store is
+    a per-machine or per-vendor silo you can't take with you, and anything the
+    agent reads (tool output, a web page) can write into what it believes — an
+    attack already <a href="https://github.com/ghostlygawd/amber/blob/main/docs/problem-map.md">demonstrated in the wild</a>.</p>
   </div>
 
   <div class="frame">
@@ -166,6 +168,9 @@
     <p class="verdict">That isn't an argument against memory. It's a measurement of what
     happens when memory is unreviewed, unbudgeted, and never pruned — the exact
     failure Amber is built to prevent.</p>
+    <p>The same study shows what agents <em>do</em> follow: explicit, specific
+    instructions. The dead weight is bulk repository overview — so Amber stores
+    decisions, preferences, and corrections, nothing encyclopedic.</p>
     <p>So Amber makes no accuracy promises. It shows its work instead:
     <span class="mono">recall --why</span> lists every injected memory and the reason.
     If memory isn't earning its tokens in your workflow, Amber is the tool that

@@ -123,6 +123,11 @@ pruned** — and it is the design brief Amber is built from:
 - **show your work** (`amber recall --why`) — so "did it help?" is
   answered with your data, not our claim.
 
+The same study points at what *does* work: agents reliably followed
+explicit, specific instructions — the dead weight was bulk repository
+overview. So Amber stores decisions, preferences, and corrections,
+not summaries of your codebase.
+
 We deliberately make no benchmark-accuracy promises about injected
 memory. If it isn't earning its tokens in your workflow, Amber is the
 one memory tool that will show you that too.

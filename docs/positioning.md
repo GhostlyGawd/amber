@@ -19,11 +19,11 @@ of them; every sentence of copy must connect to one of them.
 
 ## The three pains (named, so copy can reference them)
 
-| # | Pain | What the user experiences | Evidence |
+| # | Pain | What the user experiences | Evidence (verified 2026-07, see [problem-map.md](problem-map.md)) |
 |---|------|---------------------------|----------|
-| P1 | **Groundhog Day** | Re-explaining the stack, the conventions, the decisions — every single session. | Native-memory demand threads (anthropics/claude-code #23544, #23750, #34776, #38536); customer research rated this STRONG. See [problem-map.md](problem-map.md). |
-| P2 | **Rot** | The DIY fix for P1 — a fat CLAUDE.md / AGENTS.md — accumulates contradictions and stale facts nobody audits. The evidence says this actively backfires: context files often don't improve task success, raise cost, and LLM-generated ones can make results worse. | ETH Zurich AGENTS.md study; see [benchmarks.md](benchmarks.md#what-the-evidence-against-context-files-actually-says). |
-| P3 | **Shadow state** | The vendor fix for P1 — native auto-memory — writes things you can't fully inspect, port, or delete, and anything the agent reads can write into it (poisoning). Your accumulated context is also locked to one tool. | Threat model + poisoning literature; see [threat-model.md](threat-model.md) and [problem-map.md](problem-map.md). |
+| P1 | **Groundhog Day** | Re-explaining the stack, the conventions, the decisions — every single session. | Every major vendor shipped session memory in 2025–26 (the market's revealed belief that forgetting hurts); LongMemEval (peer-reviewed) measures ~30% multi-session recall drops; cross-machine-sync requests (claude-code #56793). |
+| P2 | **Rot** | The DIY fix for P1 — a fat CLAUDE.md / AGENTS.md — accumulates contradictions and stale facts nobody audits. The evidence says this actively backfires: context files often don't improve task success, raise cost, and LLM-generated ones can make results worse. | ETH Zurich AGENTS.md study ([benchmarks.md](benchmarks.md#what-the-evidence-against-context-files-actually-says)); Anthropic's own docs admit no compliance guarantee, adherence loss past ~200 lines, arbitrary contradiction handling; governance thread claude-code #34776. |
+| P3 | **Shadow state** | The vendor fix for P1 — native auto-memory — writes things you can't fully inspect, port, or delete, and anything the agent reads can write into it (poisoning). Your accumulated context is also locked to one tool. | Verified: **no surveyed vendor ships review-before-save**; users file disable requests (claude-code #23544, #23750); the SpAIware exploit demonstrated poisoning via unattended memory writes; no surveyed store is portable across agents. See [threat-model.md](threat-model.md). |
 
 P1 is why people want memory. P2 and P3 are why the existing answers
 to P1 fail. Amber exists in that gap.

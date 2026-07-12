@@ -11,7 +11,12 @@ in a real launch you run the gate first.)
    - "memory that doesn't rot"
    Drive traffic; measure visitor → waitlist conversion.
 2. **10 interviews** sourced from the native-memory issue threads
-   (anthropics/claude-code #23544, #23750, #34776, #38536). Ask about the
+   (anthropics/claude-code #23544, #23750, #34776, #56793 — all
+   verified live 2026-07; #38536 from the original brief did not
+   surface in the verification pass, confirm it exists before using).
+   Note what these threads actually are: #23544/#23750 ask to
+   *disable* auto-memory and #34776 asks for governance — the demand
+   is for control over memory, not just more of it. Ask about the
    pain unprompted before describing Amber.
 
 ## Kill criteria (founder-signed, F2)
