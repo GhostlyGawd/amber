@@ -30,6 +30,8 @@ quarantined.
 ## Key documents
 
 - README: https://github.com/ghostlygawd/amber/blob/main/README.md
+- Positioning (the problem, the claims, the sentence test): https://github.com/ghostlygawd/amber/blob/main/docs/positioning.md
+- Problem map (pains → solutions → gaps, with sources): https://github.com/ghostlygawd/amber/blob/main/docs/problem-map.md
 - Threat model (memory poisoning defenses): https://github.com/ghostlygawd/amber/blob/main/docs/threat-model.md
 - Interchange schema (amber.v1, open format): https://github.com/ghostlygawd/amber/blob/main/docs/interchange-schema.json
 - Extraction prompt (published verbatim): https://github.com/ghostlygawd/amber/blob/main/docs/prompts/extract.md

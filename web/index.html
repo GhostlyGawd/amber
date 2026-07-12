@@ -3,8 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Amber — memory for AI coding agents</title>
-<meta name="description" content="Local-first, long-term memory for AI coding agents. One Go binary, one SQLite file you own. No Docker, no key, no account.">
+<title>Amber — reviewed memory for AI coding agents</title>
+<meta name="description" content="Your coding agent forgets everything between sessions. Amber is reviewed memory: it learns from your sessions, you approve what it keeps, and it's one local SQLite file you own.">
+<meta property="og:title" content="Amber — reviewed memory for AI coding agents">
+<meta property="og:description" content="Stop re-explaining your project every session — without letting agent memory rot. Local-first, reviewable, yours.">
+<meta property="og:type" content="website">
 <style>
   :root {
     --cream: #FFFBEB; --paper: #FFF7E0; --ink: #2A2420; --faint: #7A6E5F;
@@ -16,6 +19,14 @@
       --amber: #F59E0B; --amber-bright: #FBBF24; --rule: #322A1E; --code-bg: #211A11;
     }
   }
+  :root[data-theme="dark"] {
+    --cream: #17130E; --paper: #1E1811; --ink: #EDE4D3; --faint: #A89B86;
+    --amber: #F59E0B; --amber-bright: #FBBF24; --rule: #322A1E; --code-bg: #211A11;
+  }
+  :root[data-theme="light"] {
+    --cream: #FFFBEB; --paper: #FFF7E0; --ink: #2A2420; --faint: #7A6E5F;
+    --amber: #B45309; --amber-bright: #D97706; --rule: #E7D9BE; --code-bg: #FDF3D8;
+  }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
   body {
@@ -25,79 +36,176 @@
   }
   .mono { font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace; }
   .wrap { max-width: 760px; margin: 0 auto; padding: 0 24px; }
-  header { padding: 72px 0 12px; }
+  header { padding: 72px 0 8px; }
   .brand { font-size: 15px; letter-spacing: .28em; text-transform: uppercase; color: var(--amber); font-weight: 600; }
-  h1 { font-size: clamp(32px, 6vw, 52px); line-height: 1.08; margin: 20px 0 8px; font-weight: 600; letter-spacing: -0.01em; }
-  .sub { font-size: 20px; color: var(--faint); max-width: 34em; }
-  .frame { font-size: 17px; margin: 28px 0; padding: 18px 22px; border-left: 3px solid var(--amber); background: var(--paper); border-radius: 0 6px 6px 0; }
+  h1 { font-size: clamp(32px, 6vw, 52px); line-height: 1.08; margin: 20px 0 14px; font-weight: 600; letter-spacing: -0.01em; }
+  .sub { font-size: 19px; color: var(--faint); max-width: 36em; margin: 0 0 26px; }
+  .sub b { color: var(--ink); font-weight: 600; }
+  .cta { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 0 0 10px; }
+  .btn {
+    display: inline-block; padding: 10px 18px; border-radius: 8px; font-size: 15px;
+    text-decoration: none; border: 1px solid var(--rule); color: var(--ink); background: var(--paper);
+  }
+  .btn.primary { background: var(--amber); border-color: var(--amber); color: #FFFBEB; font-weight: 600; }
+  .btn:hover { border-color: var(--amber); }
+  .installline {
+    display: flex; align-items: center; gap: 10px; margin: 14px 0 0; padding: 10px 14px;
+    background: var(--code-bg); border: 1px solid var(--rule); border-radius: 8px;
+    font-size: 13.5px; overflow-x: auto; white-space: nowrap;
+  }
+  .installline button {
+    flex: none; font-size: 12px; border: 1px solid var(--rule); background: var(--paper);
+    color: var(--faint); border-radius: 6px; padding: 4px 8px; cursor: pointer;
+  }
+  .frame { font-size: 17px; margin: 34px 0; padding: 18px 22px; border-left: 3px solid var(--amber); background: var(--paper); border-radius: 0 6px 6px 0; }
   .frame b { color: var(--amber); font-weight: 600; }
   pre { background: var(--code-bg); border: 1px solid var(--rule); border-radius: 8px; padding: 16px 18px; overflow-x: auto; font-size: 14.5px; }
   pre .c { color: var(--faint); }
   pre .p { color: var(--amber); }
   h2 { font-size: 14px; letter-spacing: .16em; text-transform: uppercase; color: var(--faint); margin: 56px 0 18px; font-weight: 600; }
+  .pain { margin: 0 0 22px; }
+  .pain h3 { font-size: 18px; margin: 0 0 6px; font-weight: 600; }
+  .pain h3 .k { color: var(--amber); }
+  .pain p { margin: 0; color: var(--faint); }
+  .pain p b { color: var(--ink); font-weight: 600; }
+  .pain a { color: var(--amber); }
   ul.diff { list-style: none; padding: 0; margin: 0; display: grid; gap: 14px; }
   ul.diff li { padding-left: 26px; position: relative; }
   ul.diff li::before { content: "◆"; position: absolute; left: 0; color: var(--amber); font-size: 12px; top: 4px; }
   ul.diff b { font-weight: 600; }
+  ul.diff .tag { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--amber); font-weight: 600; }
+  ol.four { padding-left: 22px; margin: 0; display: grid; gap: 10px; }
+  ol.four .mono { font-size: 13.5px; color: var(--amber); }
+  .evidence { background: var(--paper); border: 1px solid var(--rule); border-radius: 8px; padding: 20px 22px; }
+  .evidence p { margin: 0 0 12px; }
+  .evidence p:last-child { margin: 0; }
+  .evidence a { color: var(--amber); }
+  .evidence .verdict { font-weight: 600; }
   .rule { height: 1px; background: var(--rule); border: 0; margin: 56px 0; }
   footer { color: var(--faint); font-size: 14px; padding: 8px 0 72px; }
   footer a { color: var(--amber); }
-  .toggle { position: fixed; top: 14px; right: 14px; font-size: 12px; color: var(--faint); background: var(--paper); border: 1px solid var(--rule); border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+  a { color: var(--amber); }
   [data-headline="b"] .hl-a { display: none; }
   [data-headline="a"] .hl-b { display: none; }
 </style>
 </head>
 <body>
-<button class="toggle mono" onclick="document.documentElement.dataset.headline = document.documentElement.dataset.headline==='a'?'b':'a'">A/B headline</button>
 <div class="wrap">
   <header>
     <div class="brand">Amber</div>
+    <!-- Headline variants for the Week-0 smoke test (docs/week0-gate.md).
+         Assignment: ?v=a / ?v=b forces a variant; otherwise random once, persisted.
+         Wire your analytics to document.documentElement.dataset.headline. -->
     <h1 class="hl-a">One memory across every agent.</h1>
     <h1 class="hl-b">Memory that doesn't rot.</h1>
-    <p class="sub">Local-first, long-term memory for AI coding agents. One Go binary, one SQLite file you own. No Docker, no key, no account. Offline by default.</p>
+    <p class="sub">Every session, your coding agent starts from zero — so you explain
+    your project <em>again</em>. Amber is <b>reviewed memory</b>: it learns from your
+    sessions, <b>you approve what it keeps</b>, and everything lives in one local
+    SQLite file you own. No Docker, no API key, no account.</p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/ghostlygawd/amber#install">Install Amber</a>
+      <a class="btn" href="https://github.com/ghostlygawd/amber">Star on GitHub</a>
+      <a class="btn" href="https://github.com/ghostlygawd/amber/blob/main/docs/benchmarks.md">Benchmarks, with losses</a>
+    </div>
+    <div class="installline mono">
+      <span id="install-cmd">curl -fsSL https://raw.githubusercontent.com/ghostlygawd/amber/main/install.sh | sh</span>
+      <button onclick="navigator.clipboard.writeText(document.getElementById('install-cmd').textContent).then(()=>{this.textContent='copied'})">copy</button>
+    </div>
   </header>
+
+  <h2>The problem</h2>
+  <div class="pain">
+    <h3><span class="k">Groundhog Day.</span> Your agent forgets everything between sessions.</h3>
+    <p>The stack, the conventions, the decision you explained on Tuesday — gone.
+    You repeat yourself, session after session, and pay tokens to do it.</p>
+  </div>
+  <div class="pain">
+    <h3><span class="k">Rot.</span> The DIY fix — a fat CLAUDE.md — backfires.</h3>
+    <p>The file grows into hundreds of lines of stale facts and contradictions
+    nobody audits, injected into <b>every</b> prompt. Put to the test, this
+    practice often fails to improve task success while raising cost — and
+    machine-generated context files can make results actively
+    <b>worse</b> (<a href="https://github.com/ghostlygawd/amber/blob/main/docs/benchmarks.md#what-the-evidence-against-context-files-actually-says">the evidence</a>).</p>
+  </div>
+  <div class="pain">
+    <h3><span class="k">The black box.</span> Vendor auto-memory isn't yours.</h3>
+    <p>It quietly writes things about you and your codebase into a store you
+    can't fully read, export, or audit — locked to one tool. And anything the
+    agent reads (tool output, a web page) can write into what it believes.</p>
+  </div>
 
   <div class="frame">
     Instructions are what you <b>tell</b> an agent (CLAUDE.md).<br>
-    Memory is what it <b>learns</b> (Amber).
+    Memory is what it <b>learns</b> (Amber) — reviewed by you.
   </div>
 
-  <pre class="mono"><span class="c"># two minutes to your first memory</span>
-<span class="p">amber</span> init
+  <h2>Two minutes to your first memory</h2>
+  <pre class="mono"><span class="p">amber</span> init
 <span class="p">amber</span> remember "We deploy billing to Fly.io on Fridays" --type decision
 <span class="p">amber</span> recall "where does billing deploy"
 
-<span class="c"># ten minutes to a populated store — from history you already own</span>
+<span class="c"># ten minutes to a store that already knows your project —</span>
+<span class="c"># built from session history you already have, then reviewed by you</span>
 <span class="p">amber</span> digest --transcripts 30d
 <span class="p">amber</span> review</pre>
 
-  <h2>What makes it different</h2>
+  <h2>How it kills each problem</h2>
   <ul class="diff">
-    <li><b>Treats memory as an attack surface.</b> Trust tiers, quarantine for untrusted input, a poisoning suite in CI. Content from a web page never auto-injects until you review it.</li>
-    <li><b>Retroactive onboarding.</b> A reviewed store built from your own transcript history in about ten minutes.</li>
-    <li><b>Recall you can audit.</b> <span class="mono">recall --why</span> shows which memories were injected, their scores, and why.</li>
-    <li><b>Never auto-deletes.</b> Consolidation merges and demotes — every action journaled and reversible. Aged memories leave injection, never the store.</li>
-    <li><b>Yours to read.</b> Plain SQLite. Open it with any tool. No telemetry, no nags.</li>
+    <li><span class="tag">forgetting</span><br><b>A session-start briefing, so you stop re-explaining.</b> Budgeted to ≤700 tokens (~1% of a session), deduped against your CLAUDE.md, framed as data — not instructions.</li>
+    <li><span class="tag">rot</span><br><b>A review inbox between "the agent said it" and "the agent believes it."</b> Approve, edit, or reject what it learned. Consolidation merges duplicates and retires stale memories from the briefing — never from the store, never by silent deletion.</li>
+    <li><span class="tag">black box</span><br><b>One SQLite file, readable with any tool.</b> <span class="mono">recall --why</span> shows exactly what was injected and why. Export everything to an open format; ingest your existing CLAUDE.md / MEMORY.md in one command.</li>
+    <li><span class="tag">poisoning</span><br><b>Memory treated as an attack surface.</b> Trust tiers, taint marking, quarantine: content from tool output or web pages never auto-injects until you review it — enforced by a poisoning test suite in CI.</li>
   </ul>
+
+  <h2>Why a review step</h2>
+  <div class="evidence">
+    <p>ETH Zurich researchers tested the most common practice — a static context
+    file injected into every prompt — and found it often doesn't improve task
+    success, raises inference cost, and that LLM-generated context files made
+    results worse in most tested settings.</p>
+    <p class="verdict">That isn't an argument against memory. It's a measurement of what
+    happens when memory is unreviewed, unbudgeted, and never pruned — the exact
+    failure Amber is built to prevent.</p>
+    <p>So Amber makes no accuracy promises. It shows its work instead:
+    <span class="mono">recall --why</span> lists every injected memory and the reason.
+    If memory isn't earning its tokens in your workflow, Amber is the tool that
+    lets you see that. <a href="https://github.com/ghostlygawd/amber/blob/main/docs/benchmarks.md#what-the-evidence-against-context-files-actually-says">Read the details →</a></p>
+  </div>
+
+  <h2>Four questions to ask any memory tool</h2>
+  <ol class="four">
+    <li>Can I see everything it remembers? <span class="mono">amber browse</span></li>
+    <li>Can I see exactly what it injected, and why? <span class="mono">amber recall --why</span></li>
+    <li>Does it clean up — merge, resolve, retire — without silently deleting? <span class="mono">amber consolidate</span></li>
+    <li>Does it keep secrets out? <span class="mono">secret + PII scan on write and export</span></li>
+  </ol>
 
   <hr class="rule">
 
-  <pre class="mono"><span class="c"># the calm it aims for — wit only where it earns trust</span>
+  <pre class="mono"><span class="c"># the calm it aims for</span>
 $ <span class="p">amber</span> digest session.jsonl
 learned 4 things, updated 1, quarantined 1 (untrusted source),
 ignored the small talk.</pre>
 
   <footer>
-    <p>MIT-licensed. Benchmarks published with losses. Extraction prompt published verbatim.
+    <p>MIT-licensed. Benchmarks published with methodology, seeds, and losses.
+    Extraction prompt published verbatim.
     <a href="https://github.com/ghostlygawd/amber">github.com/ghostlygawd/amber</a></p>
-    <p><em>Name is provisional — see docs/naming.md.</em></p>
+    <p><em>The name is provisional — see <a href="https://github.com/ghostlygawd/amber/blob/main/docs/naming.md">docs/naming.md</a>.</em></p>
   </footer>
 </div>
 <script>
-  // Respect the viewer's theme toggle if the host stamps data-theme.
-  const root = document.documentElement;
-  const obs = new MutationObserver(() => {});
-  obs.observe(root, { attributes: true });
+  // Headline variant: ?v=a|b wins; else sticky random assignment.
+  (function () {
+    var q = new URLSearchParams(location.search).get('v');
+    var v = (q === 'a' || q === 'b') ? q : null;
+    try {
+      if (!v) v = localStorage.getItem('amber-hl');
+      if (!v) { v = Math.random() < 0.5 ? 'a' : 'b'; }
+      localStorage.setItem('amber-hl', v);
+    } catch (e) { v = v || 'a'; }
+    document.documentElement.dataset.headline = v;
+  })();
 </script>
 </body>
 </html>

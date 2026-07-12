@@ -1,5 +1,7 @@
 # Amber documentation
 
+- [Positioning](positioning.md) — the problem we solve, the claims we make (and refuse to make), and the sentence test every user-facing word must pass.
+- [Problem map](problem-map.md) — documented user pains → existing solutions → gaps → Amber's answer, with sources.
 - [Decision log (D1–D18, F1–F4)](decisions/DECISIONS.md) — what was chosen and why.
 - [Threat model](threat-model.md) — memory poisoning and the six defenses.
 - [Storage schema](schema.md) — the SQLite tables and the ops journal.

@@ -4,19 +4,50 @@
 binary, one SQLite file you own. No Docker, no API key, no account,
 offline by default.
 
-> Instructions are what you *tell* an agent (CLAUDE.md / AGENTS.md).
-> Memory is what it *learns* (Amber).
+## The problem
 
-*Memory you can read.* Every memory is inspectable, every write is
-previewable as a diff, every change is reversible, every untrusted input
-is quarantined.
+Every session, your coding agent starts from zero. The stack, the
+conventions, the decision you explained on Tuesday — gone. So you
+explain it again.
+
+The two standard fixes trade forgetting for something worse:
+
+- **The ever-growing context file.** CLAUDE.md / AGENTS.md swells into
+  hundreds of lines of stale facts and contradictions that nobody
+  audits — and that get pushed into *every* prompt. Tested
+  empirically, this backfires: static context files often fail to
+  improve task success while raising cost, and LLM-generated ones can
+  make results actively worse
+  ([what the evidence says](docs/benchmarks.md#what-the-evidence-against-context-files-actually-says)).
+- **The vendor's auto-memory.** The agent quietly writes things about
+  you and your codebase into a store you can't fully read, export, or
+  audit — locked to one tool. And anything the agent reads (tool
+  output, a web page) can write into what it believes.
+
+## What Amber does
+
+Amber is **reviewed memory**. It learns from your sessions, **you
+approve what it keeps**, and it injects a small, budgeted, current
+briefing — from one SQLite file you own and can take to any agent.
+
+- **Remembers for you.** A session-start briefing so you stop
+  re-explaining; a populated store built from transcript history you
+  already have, in about ten minutes.
+- **Curated, not hoarded.** A review inbox, dedupe, contradiction
+  handling, and a ≤700-token injection budget (~1% of a session).
+  Stale memories age out of the briefing — never out of the store.
+- **Yours to read, audit, and take.** Plain SQLite, an open export
+  format, `recall --why` showing exactly what was injected and why,
+  and quarantine for anything that came from an untrusted source.
+
+> Instructions are what you *tell* an agent (CLAUDE.md / AGENTS.md).
+> Memory is what it *learns* (Amber). Amber keeps your CLAUDE.md —
+> and governs the learned half.
 
 > **Name notice.** "Amber" is provisional — it collides with
-> amber-lang.com and others. Paths, env vars, and the binary are all
-> `amber` / `~/.amber/` / `AMBER_*` so a rename is a mechanical
-> find/replace. See [docs/naming.md](docs/naming.md).
-
----
+> amber-lang.com and others. Everything is `amber` / `~/.amber/` /
+> `AMBER_*` so a rename is a mechanical find/replace. See
+> [docs/naming.md](docs/naming.md).
 
 ## Install
 
@@ -43,11 +74,11 @@ amber remember "We deploy the billing service to Fly.io on Fridays" --type decis
 amber recall "where does billing deploy"
 ```
 
-## Ten minutes to a populated store
+## Ten minutes to a store that already knows your project
 
-Amber can build an initial store from history you already own — your
-local Claude Code transcripts — and from your existing memory files.
-**Nobody else does this.**
+You've already explained your project to your agent — in past
+sessions. Amber can read that history back and turn it into reviewed
+memories, so day one doesn't start from zero:
 
 ```sh
 amber digest --transcripts 30d  # digest the last 30 days of sessions
@@ -60,11 +91,11 @@ amber review                    # approve / edit / reject what it learned
 amber hooks install             # SessionStart recall + SessionEnd digest
 ```
 
-- **SessionStart** injects a token-budgeted briefing (≤700 tokens by
-  default, ~1% of a session), framed as *data, not instructions*, and
-  deduped against your CLAUDE.md.
-- **SessionEnd** digests the transcript into new memories, routed through
-  the review inbox until you switch the posture to automatic.
+- **SessionStart** injects the briefing: token-budgeted (≤700 by
+  default), framed as *data, not instructions*, deduped against your
+  CLAUDE.md so nothing is said twice.
+- **SessionEnd** digests the session into proposed memories, routed
+  through the review inbox until you choose to trust it on autopilot.
 
 Or mount the MCP server from any client:
 
@@ -72,59 +103,68 @@ Or mount the MCP server from any client:
 claude mcp add amber -- amber serve
 ```
 
-## Why not just CLAUDE.md?
+## Why a review step? (what the evidence says)
 
-CLAUDE.md is great — and Amber keeps it. Instructions are what you *tell*
-an agent; memory is what it *learns*. The problem isn't the file, it's
-the *unreviewed* file: 800 lines of accumulated contradictions no one
-audits, a secret pasted into a repo, or an untrusted tool result quietly
-writing an instruction into your agent's head.
+Researchers at ETH Zurich tested the most common memory practice — a
+static context file injected into every prompt — and found it often
+doesn't improve task success, raises inference cost, and that
+LLM-generated context files made results *worse* in most tested
+settings ([details and citation](docs/benchmarks.md#what-the-evidence-against-context-files-actually-says)).
 
-Amber gives the learned half a review inbox, a provenance trail, a
-quarantine for untrusted input, and a committable DECISIONS.md. Same
-plain text you own — governed.
+That result is not an argument against memory. It is a measurement of
+what happens when memory is **unreviewed, unbudgeted, and never
+pruned** — and it is the design brief Amber is built from:
 
-The empirical case for heavy memory infrastructure is genuinely
-contested ([ETH Zurich's AGENTS.md study](docs/benchmarks.md#the-honest-counter-narrative)
-found context files often *don't* improve task success). So Amber does
-not compete on accuracy claims. It competes on **control, craft, and
-ownership**.
+- **review before it's kept** (`amber review`),
+- **budget what's injected** (≤700 tokens, visible in `status`,
+  deduped against CLAUDE.md),
+- **retire what goes stale** (`amber consolidate` demotes; never
+  deletes),
+- **show your work** (`amber recall --why`) — so "did it help?" is
+  answered with your data, not our claim.
 
-## What makes it different
+We deliberately make no benchmark-accuracy promises about injected
+memory. If it isn't earning its tokens in your workflow, Amber is the
+one memory tool that will show you that too.
 
-- **Treats memory as an attack surface.** Trust tiers (T0–T3), a
-  declarative-only constraint, taint marking, a quarantine inbox, and a
-  poisoning test suite in CI. Content from tool output or web pages is
-  quarantined and never auto-injected until you review it. See
-  [docs/threat-model.md](docs/threat-model.md).
-- **Retroactive onboarding.** A populated, reviewed store from your own
-  transcript history in about ten minutes.
-- **Competitor-file ingestion.** `amber digest MEMORY.md` / `CLAUDE.md` /
-  `AGENTS.md` — a one-command migration path.
-- **Auto-maintained DECISIONS.md** and a published, open
-  [interchange schema](docs/interchange-schema.json).
-- **Recall attribution.** `amber recall --why` shows which memories were
-  retrieved, their scores, and why they were included. Nobody else ships
-  this.
-- **Never auto-deletes.** Consolidation merges, resolves, and demotes —
-  but every action is journaled and reversible. Aged memories leave
-  auto-injection; they never leave the store.
+## Why not just the vendor's built-in memory?
 
-## The reviewer test
+Native auto-memory answers "the agent forgets" — but it creates the
+problems Amber refuses to have:
 
-Amber is built to pass all four (the gaps a competitive sweep exposed):
+- **You can't fully see it.** Amber is one SQLite file; open it with
+  any tool. `amber browse` gives you an inspector; `recall --why`
+  shows every injection.
+- **You can't take it with you.** Amber exports everything
+  (`jsonl`, markdown, a committable DECISIONS.md) under an
+  [open interchange schema](docs/interchange-schema.json) — and can
+  *ingest* your existing MEMORY.md / CLAUDE.md / AGENTS.md as a
+  one-command migration.
+- **It believes what it reads.** Content from tool output or web
+  pages is quarantined in Amber — tiered by trust, marked as tainted,
+  never auto-injected until you approve it, with a poisoning test
+  suite in CI. See [docs/threat-model.md](docs/threat-model.md).
+- **It's a black box on someone else's roadmap.** Amber is MIT, local,
+  offline by default, telemetry-off.
 
-1. Does it consolidate? — `amber consolidate` (D16)
-2. Can I see what it remembers? — `amber browse` (D17)
-3. Can I see why it injected that? — `amber recall --why` (D18)
-4. Does it redact secrets? — secret + PII scan on write and export (§10)
+## Four questions to ask any memory tool
+
+1. Can I see everything it remembers? — `amber browse`
+2. Can I see exactly what it injected, and why? — `amber recall --why`
+3. Does it clean up after itself — merge duplicates, resolve
+   contradictions, retire stale facts — without silently deleting? —
+   `amber consolidate`
+4. Does it keep secrets out? — secret + PII scan on write and export
+
+Amber is built to answer yes to all four. Ask the same four of
+anything else holding your context.
 
 ## Command tour
 
 | Command | What it does |
 |---|---|
 | `amber init` | Create a store; set up embeddings; offer retroactive digest + interview |
-| `amber remember <text>` | Store a memory (user-stated, T0); dedupe + supersedence + secret scan |
+| `amber remember <text>` | Store a memory (user-stated, highest trust); dedupe + supersedence + secret scan |
 | `amber recall <query> [--why] [--format context]` | Hybrid semantic + exact search with attribution |
 | `amber browse` | TUI: search, filter, inspect; view chains and trust tiers |
 | `amber review` | Approve / edit / reject quarantined and auto-digested memories |
@@ -150,17 +190,19 @@ interactive step has a non-interactive flag; exit codes are script-safe
   committable plain-text export today (PR-reviewable), not live sync.
 - **Not a RAG tool.** Amber stores what the agent *experienced*, not
   what documents *say*. No AST/code-graph parsing, no multi-hop graph
-  retrieval, no bi-temporal validity windows — [consciously rejected for
-  v1](docs/decisions/DECISIONS.md), not overlooked.
+  retrieval — [consciously rejected for v1](docs/decisions/DECISIONS.md),
+  not overlooked.
 - **The name is provisional.** See above.
 
 ## Design & decisions
 
-The full build spec, decision log, and strategy live in
-[`docs/`](docs/). Start with [the decision log](docs/decisions/DECISIONS.md)
-and [the threat model](docs/threat-model.md). The extraction prompt is
-[published verbatim](docs/prompts/extract.md). Benchmarks are published
-with methodology, judge prompts, seeds, and losses.
+What we say and why we say it: [docs/positioning.md](docs/positioning.md).
+The pain-point → existing-solutions → gap map, with sources:
+[docs/problem-map.md](docs/problem-map.md). The decision log is
+[docs/decisions/DECISIONS.md](docs/decisions/DECISIONS.md), the threat
+model [docs/threat-model.md](docs/threat-model.md), and the extraction
+prompt is [published verbatim](docs/prompts/extract.md). Benchmarks are
+published with methodology, judge prompts, seeds, and losses.
 
 ## License
 

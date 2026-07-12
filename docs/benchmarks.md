@@ -86,21 +86,40 @@ The output JSON contains per-question results **including every loss**,
 the seed, and recall-latency percentiles. We publish the results file
 alongside each tagged release; we do not cherry-pick question types.
 
-## The honest counter-narrative
+## What the evidence against context files actually says
 
-The empirical case for heavy memory infrastructure is genuinely
-contested. The ETH Zurich AGENTS.md study (arXiv:2602.11988) found that
-context files often do *not* improve task success while raising inference
-cost >20%, and that LLM-generated context files sometimes *hurt* (task
-success dropped in 5 of 8 settings).
+The most common memory practice today is a static context file
+(AGENTS.md / CLAUDE.md) injected into every prompt, growing forever,
+reviewed by no one. ETH Zurich researchers put that practice to the
+test (the AGENTS.md study, arXiv:2602.11988) and found:
 
-We take this seriously rather than burying it. It is why Amber:
+- context files often did **not** improve task success;
+- they raised inference cost by **more than 20%** (the file rides
+  along in every prompt, helpful or not);
+- LLM-*generated* context files sometimes actively hurt — task
+  success **dropped in 5 of 8 settings**.
 
-- **budgets and gates injection** (≤700 tokens, visible in `status`,
-  deduped against CLAUDE.md) instead of dumping memory into every prompt;
-- **does not compete on raw accuracy claims** — it competes on control,
-  audit, and ownership;
-- ships `recall --why` so you can see exactly what was injected and
-  decide whether it helped.
+Read carefully, this is not a finding that "memory doesn't work." The
+study never tested reviewed, budgeted, retrieved-on-demand memory —
+it tested **unreviewed, unbudgeted, always-injected accumulation**,
+and found that it costs real money and can make agents worse. That is
+a controlled measurement of the failure mode users already report as
+CLAUDE.md bloat and rot.
 
-If memory doesn't help your workflow, Amber makes that measurable too.
+In other words: the study is the design brief. Each finding maps to a
+design rule Amber enforces:
+
+| Study finding | The failure it exposes | Amber's rule |
+|---|---|---|
+| Files ride along in every prompt, raising cost >20% | No budget, no relevance gate | Injection is **budgeted** (≤700 tokens, ~1% of a session), recalled per-query, visible in `status`, deduped against CLAUDE.md |
+| LLM-generated files hurt in 5 of 8 settings | Machine-written context that no human checked | Machine-extracted memories land in a **review inbox** — you approve, edit, or reject before they're ever injected |
+| Accumulated context doesn't improve success | Stale and contradictory entries never pruned | `consolidate` merges duplicates, resolves contradictions, and **retires stale memories from injection** (never from the store) |
+
+One honest consequence remains, and we accept it: if unreviewed
+context doesn't reliably improve task success, we will not promise
+that reviewed context does. Whether *your* curated 700 tokens earn
+their keep is an empirical question about *your* workflow — so Amber
+ships the instrument instead of the claim: `recall --why` shows
+exactly what was injected and why, and injection is visible in
+`status` and can be turned off. If memory isn't helping you, Amber is
+the tool that lets you see that.
