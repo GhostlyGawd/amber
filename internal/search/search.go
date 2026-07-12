@@ -3,6 +3,10 @@
 // fusion, then modulated by importance × trust × per-type recency decay.
 // Every recall can explain itself (--why): which memories, which scores,
 // why included (decision D18).
+//
+// Hot-path discipline: candidate generation touches ids, ranks, and the
+// vector cache only; full rows are loaded for the fused finalists. This
+// is what holds p50 < 50ms at 50k memories.
 package search
 
 import (
@@ -14,6 +18,7 @@ import (
 	"github.com/ghostlygawd/amber/internal/belief"
 	"github.com/ghostlygawd/amber/internal/embed"
 	"github.com/ghostlygawd/amber/internal/store"
+	"github.com/ghostlygawd/amber/internal/vectorcache"
 )
 
 // Request describes one recall.
@@ -60,21 +65,25 @@ func Recall(s *store.Store, e embed.Embedder, req Request) ([]Result, error) {
 	if limit <= 0 {
 		limit = 8
 	}
-	// Filters applied pre-fusion (§7): status set, type, entity, since.
 	statuses := []string{store.StatusActive, store.StatusAging}
 	if req.History {
 		statuses = append(statuses, store.StatusSuperseded, store.StatusTombstoned, store.StatusQuarantined)
 	}
-	pool, err := s.List(store.ListFilter{Statuses: statuses, Types: req.Types, Entity: req.Entity, Since: req.Since})
-	if err != nil {
-		return nil, err
-	}
-	if len(pool) == 0 {
-		return nil, nil
-	}
-	byID := make(map[string]*store.Memory, len(pool))
-	for _, m := range pool {
-		byID[m.ID] = m
+
+	// Pre-fusion filters (§7) as an id set. nil = "default pool, no
+	// narrowing" so the common case skips the id scan entirely for the
+	// cache path and lets SQL do status filtering for FTS.
+	var allowed map[string]bool
+	narrowing := req.Entity != "" || len(req.Types) > 0 || !req.Since.IsZero() || req.History
+	if narrowing {
+		var err error
+		allowed, err = s.FilteredIDs(store.ListFilter{Statuses: statuses, Types: req.Types, Entity: req.Entity, Since: req.Since})
+		if err != nil {
+			return nil, err
+		}
+		if len(allowed) == 0 {
+			return nil, nil
+		}
 	}
 
 	candN := limit * 6
@@ -82,19 +91,16 @@ func Recall(s *store.Store, e embed.Embedder, req Request) ([]Result, error) {
 		candN = 50
 	}
 
-	lexRank, bm25 := lexicalRanks(s, req.Query, byID, candN)
-	semRank, cosSim := semanticRanks(e, req.Query, pool, candN)
+	lexRank, bm25 := lexicalRanks(s, req.Query, statuses, allowed, candN)
+	semRank, cosSim := semanticRanks(s, e, req, statuses, allowed, candN)
 
-	// Fusion: reciprocal rank fusion over both lists.
-	type fused struct {
-		m *store.Memory
-		a Attribution
-	}
+	// Fusion: reciprocal rank fusion over both candidate lists.
+	type fused struct{ a Attribution }
 	fusedMap := map[string]*fused{}
 	touch := func(id string) *fused {
 		f, ok := fusedMap[id]
 		if !ok {
-			f = &fused{m: byID[id]}
+			f = &fused{}
 			fusedMap[id] = f
 		}
 		return f
@@ -111,14 +117,28 @@ func Recall(s *store.Store, e embed.Embedder, req Request) ([]Result, error) {
 		f.a.Cosine = cosSim[id]
 		f.a.RRF += 1.0 / (rrfK + float64(r))
 	}
+	if len(fusedMap) == 0 {
+		return nil, nil
+	}
+
+	// Load full rows for finalists only.
+	ids := make([]string, 0, len(fusedMap))
+	for id := range fusedMap {
+		ids = append(ids, id)
+	}
+	rowsByID, err := s.GetMany(ids)
+	if err != nil {
+		return nil, err
+	}
 
 	var results []Result
-	for _, f := range fusedMap {
-		if f.m == nil {
+	for id, f := range fusedMap {
+		m, ok := rowsByID[id]
+		if !ok {
 			continue
 		}
-		score, attr := modulate(f.m, f.a, req.Now)
-		results = append(results, Result{Memory: f.m, Score: score, Why: attr})
+		score, attr := modulate(m, f.a, req.Now)
+		results = append(results, Result{Memory: m, Score: score, Why: attr})
 	}
 	sort.Slice(results, func(i, j int) bool {
 		if results[i].Score != results[j].Score {
@@ -180,13 +200,11 @@ func recencyFactor(m *store.Memory, now time.Time) float64 {
 		return 1.0
 	}
 	// Floor at 0.3: old events rank lower but stay findable.
-	f := 0.3 + 0.7*halfDecay(age, hl)
-	return f
+	return 0.3 + 0.7*halfDecay(age, hl)
 }
 
 func halfDecay(age, hl time.Duration) float64 {
 	x := float64(age) / float64(hl)
-	// 2^-x without math import churn
 	v := 1.0
 	for x >= 1 {
 		v /= 2
@@ -197,23 +215,32 @@ func halfDecay(age, hl time.Duration) float64 {
 	return v * (1 - 0.5*x)
 }
 
-// lexicalRanks runs FTS5 BM25 over the query, restricted to the filtered
-// pool. Returns id→rank (1-based) and id→bm25 (negative = better in
-// SQLite; we negate so higher = better).
-func lexicalRanks(s *store.Store, query string, pool map[string]*store.Memory, n int) (map[string]int, map[string]float64) {
+// lexicalRanks runs FTS5 BM25 over the query. Status filtering happens in
+// SQL; the optional allowed set narrows further (entity/type/since).
+func lexicalRanks(s *store.Store, query string, statuses []string, allowed map[string]bool, n int) (map[string]int, map[string]float64) {
 	ranks := map[string]int{}
 	scores := map[string]float64{}
 	match := ftsQuery(query)
 	if match == "" {
 		return ranks, scores
 	}
-	rows, err := s.DB.Query(`
-		SELECT m.id, bm25(memories_fts) AS score
+	args := []any{match}
+	statusIn := make([]string, len(statuses))
+	for i, st := range statuses {
+		statusIn[i] = "?"
+		_ = st
+	}
+	q := `SELECT m.id, bm25(memories_fts) AS score
 		FROM memories_fts JOIN memories m ON m.rowid = memories_fts.rowid
-		WHERE memories_fts MATCH ?
-		ORDER BY score LIMIT ?`, match, n)
+		WHERE memories_fts MATCH ? AND m.status IN (` + strings.Join(statusIn, ",") + `)
+		ORDER BY score LIMIT ?`
+	for _, st := range statuses {
+		args = append(args, st)
+	}
+	args = append(args, n*2)
+	rows, err := s.DB.Query(q, args...)
 	if err != nil {
-		return ranks, scores // e.g. all-stopword query; fall back to semantic only
+		return ranks, scores // e.g. all-stopword query; semantic side still runs
 	}
 	defer rows.Close()
 	r := 0
@@ -223,22 +250,50 @@ func lexicalRanks(s *store.Store, query string, pool map[string]*store.Memory, n
 		if err := rows.Scan(&id, &sc); err != nil {
 			break
 		}
-		if _, ok := pool[id]; !ok {
-			continue // filtered out (status/type/entity/since)
+		if allowed != nil && !allowed[id] {
+			continue
 		}
 		r++
 		ranks[id] = r
 		scores[id] = -sc
+		if r >= n {
+			break
+		}
 	}
 	return ranks, scores
 }
 
+// ftsStopwords are dropped from the lexical query. They carry almost no
+// discriminative signal but, OR-ed together, force FTS5 to rank nearly
+// the whole corpus — the dominant cost at scale. The semantic side still
+// sees the full query, so meaning is not lost.
+var ftsStopwords = map[string]bool{
+	"a": true, "an": true, "the": true, "of": true, "to": true, "in": true, "on": true,
+	"at": true, "by": true, "for": true, "and": true, "or": true, "is": true, "are": true,
+	"was": true, "were": true, "be": true, "been": true, "it": true, "its": true, "as": true,
+	"with": true, "that": true, "this": true, "these": true, "those": true, "do": true,
+	"does": true, "did": true, "how": true, "what": true, "which": true, "who": true,
+	"when": true, "where": true, "why": true, "i": true, "we": true, "you": true, "my": true,
+	"our": true, "about": true, "from": true, "should": true, "would": true, "can": true,
+}
+
 // ftsQuery sanitizes free text into an FTS5 OR-query of quoted terms, so
-// user punctuation can't break MATCH syntax.
+// user punctuation can't break MATCH syntax. Stopwords are dropped unless
+// the whole query is stopwords (then they are kept, so a query like
+// "what is it" still matches something).
 func ftsQuery(q string) string {
-	fields := strings.Fields(store.NormalizeContent(q))
-	if len(fields) == 0 {
+	all := strings.Fields(store.NormalizeContent(q))
+	if len(all) == 0 {
 		return ""
+	}
+	fields := make([]string, 0, len(all))
+	for _, f := range all {
+		if !ftsStopwords[f] {
+			fields = append(fields, f)
+		}
+	}
+	if len(fields) == 0 {
+		fields = all // query was all stopwords; keep them rather than match nothing
 	}
 	if len(fields) > 12 {
 		fields = fields[:12]
@@ -250,51 +305,67 @@ func ftsQuery(q string) string {
 	return strings.Join(quoted, " OR ")
 }
 
-// semanticRanks embeds the query and brute-force scans pool embeddings.
-func semanticRanks(e embed.Embedder, query string, pool []*store.Memory, n int) (map[string]int, map[string]float64) {
+// semanticRanks embeds the query and scans vectors. Default pool goes
+// through the sidecar cache (fast path); history/filtered pools fall back
+// to a lean DB scan.
+func semanticRanks(s *store.Store, e embed.Embedder, req Request, statuses []string, allowed map[string]bool, n int) (map[string]int, map[string]float64) {
 	ranks := map[string]int{}
 	sims := map[string]float64{}
-	if e == nil || query == "" {
+	if e == nil || req.Query == "" {
 		return ranks, sims
 	}
-	qv, err := e.Embed(query)
-	if err != nil {
+	qv, err := e.Embed(req.Query)
+	if err != nil || len(qv) == 0 {
 		return ranks, sims
 	}
-	type hit struct {
-		id  string
-		sim float64
-	}
-	hits := make([]hit, 0, len(pool))
-	for _, m := range pool {
-		if len(m.Embedding) == 0 {
-			continue
+
+	var hits []vectorcache.Hit
+	if !req.History {
+		// Cache covers active+aging — exactly the default pool.
+		if c, cerr := vectorcache.Open(s, s.Dir, e.Name(), e.Dims()); cerr == nil {
+			hits = c.TopK(qv, n, allowed)
 		}
-		sim := embed.Cosine(qv, m.Embedding)
-		if sim <= 0 {
-			continue
-		}
-		hits = append(hits, hit{m.ID, sim})
 	}
-	sort.Slice(hits, func(i, j int) bool { return hits[i].sim > hits[j].sim })
-	if len(hits) > n {
-		hits = hits[:n]
+	if hits == nil {
+		type hit struct {
+			id  string
+			sim float64
+		}
+		var all []hit
+		_ = s.ScanVectors(statuses, func(id string, vec []float32) error {
+			if allowed != nil && !allowed[id] {
+				return nil
+			}
+			sim := embed.Cosine(qv, vec)
+			if sim > 0 {
+				all = append(all, hit{id, sim})
+			}
+			return nil
+		})
+		sort.Slice(all, func(i, j int) bool { return all[i].sim > all[j].sim })
+		if len(all) > n {
+			all = all[:n]
+		}
+		hits = make([]vectorcache.Hit, len(all))
+		for i, h := range all {
+			hits[i] = vectorcache.Hit{ID: h.id, Score: h.sim}
+		}
 	}
 	for i, h := range hits {
-		ranks[h.id] = i + 1
-		sims[h.id] = h.sim
+		ranks[h.ID] = i + 1
+		sims[h.ID] = h.Score
 	}
 	return ranks, sims
 }
 
 // Briefing selects the session-start injection set with no query: active,
 // injectable-trust memories ranked by importance × trust × recency ×
-// confidence. Aging and quarantined are excluded by construction.
+// confidence. SQL pre-orders so only a bounded slice is materialized.
 func Briefing(s *store.Store, now time.Time, maxItems int) ([]Result, error) {
 	if now.IsZero() {
 		now = time.Now().UTC()
 	}
-	pool, err := s.List(store.ListFilter{Statuses: []string{store.StatusActive}, Trusts: []int{0, 1, 2}})
+	pool, err := s.List(store.ListFilter{Statuses: []string{store.StatusActive}, Trusts: []int{0, 1, 2}, Limit: 600})
 	if err != nil {
 		return nil, err
 	}

@@ -56,7 +56,7 @@ func readHookInput() hookInput {
 // against CLAUDE.md, hard token budget (§11).
 func cmdHookSessionStart() *cobra.Command {
 	return &cobra.Command{
-		Use:  "session-start",
+		Use: "session-start",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			in := readHookInput()
 			if in.CWD != "" {
@@ -120,7 +120,7 @@ func readInstructionFiles(cwd string) string {
 // diagnostics to a small log file, nothing to the console.
 func cmdHookSessionEnd() *cobra.Command {
 	return &cobra.Command{
-		Use:  "session-end",
+		Use: "session-end",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			in := readHookInput()
 			if in.TranscriptPath == "" {

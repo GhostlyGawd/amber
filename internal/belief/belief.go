@@ -38,9 +38,17 @@ type Decision struct {
 }
 
 // Thresholds (tuned by the contradiction suite; see testdata/).
+//
+// Two contradiction floors: when the token-level subject overlap is
+// strong (≥50% of the smaller claim) the claims demonstrably discuss the
+// same thing and a lower overall similarity suffices; when the only link
+// is a shared entity, require high similarity — people accrete many
+// unrelated true facts, and a low bar would let "Alice is the TL" retire
+// "Alice is on vacation".
 const (
 	dupThreshold       = 0.93
-	contraLowThreshold = 0.55
+	contraEntityFloor  = 0.55
+	contraSubjectFloor = 0.38
 	ambiguousThreshold = 0.82
 )
 
@@ -78,12 +86,16 @@ func Adjudicate(content string, newVec []float32, entities []string, candidates 
 		if sim >= dupThreshold {
 			return Decision{Verdict: VerdictDuplicate, Existing: c, Similarity: sim, Reason: fmt.Sprintf("near-duplicate (similarity %.2f)", sim)}
 		}
-		if sim < contraLowThreshold {
+		if sim < contraSubjectFloor {
 			break // ranked descending; nothing below can qualify
 		}
+		strongSubject := subjectOverlap(newToks, c)
 		sharedEntity := sharesEntity(entSet, c)
-		sameSubject := sharedEntity || subjectOverlap(newToks, c)
-		if !sameSubject {
+		floor := contraEntityFloor
+		if strongSubject {
+			floor = contraSubjectFloor
+		}
+		if (!strongSubject && !sharedEntity) || sim < floor {
 			continue
 		}
 		if incompatible(content, c.Content) {
@@ -119,19 +131,30 @@ func sharesEntity(entSet map[string]bool, c *store.Memory) bool {
 	return false
 }
 
-// subjectOverlap: leading-token overlap approximates "same subject" for
-// entity-less claims ("The staging DB is X" vs "The staging DB is Y").
+// subjectOverlap: contentful-token overlap approximates "same subject"
+// for entity-less claims ("The staging DB is X" vs "The staging DB is Y").
+// Filler words are excluded so "the billing service" cannot fake a
+// subject match between unrelated claims.
 func subjectOverlap(newToks map[string]bool, c *store.Memory) bool {
 	oldToks := tokenSet(c.Content)
-	shared := 0
+	shared, newN, oldN := 0, 0, 0
 	for t := range newToks {
+		if fillerWords[t] {
+			continue
+		}
+		newN++
 		if oldToks[t] {
 			shared++
 		}
 	}
-	minLen := len(newToks)
-	if len(oldToks) < minLen {
-		minLen = len(oldToks)
+	for t := range oldToks {
+		if !fillerWords[t] {
+			oldN++
+		}
+	}
+	minLen := newN
+	if oldN < minLen {
+		minLen = oldN
 	}
 	if minLen == 0 {
 		return false
@@ -141,9 +164,9 @@ func subjectOverlap(newToks map[string]bool, c *store.Memory) bool {
 
 // --- incompatibility heuristics ("low entailment" approximation) ---
 
-var negationRe = regexp.MustCompile(`(?i)\b(not|no longer|never|stopped|isn't|aren't|doesn't|don't|won't|wasn't|weren't|dropped|removed|deprecated|instead of|rather than|switched (?:from|away)|moved (?:off|away)|migrated (?:from|off))\b`)
+var negationRe = regexp.MustCompile(`(?i)\b(not|no longer|never|stopped|isn't|aren't|doesn't|don't|won't|wasn't|weren't|dropped|removed|deprecated|retired|replaced|instead of|rather than|switched (?:from|away|to)|moved (?:off|away)|migrated (?:from|off))\b`)
 
-var relationVerbs = regexp.MustCompile(`(?i)\b(prefers?|uses?|using|is|are|was|were|works? (?:at|on|with)|lives? in|based in|named|called|set to|runs? on|deploys? (?:to|on)|stores?|chose|chosen|decided|decision|targets?|requires?|defaults? to|written in|hosted on|will|should be)\b`)
+var relationVerbs = regexp.MustCompile(`(?i)\b(prefers?|uses?|using|is|are|was|were|works? (?:at|on|with)|lives? in|based in|named|called|set to|runs? (?:on|at|in)|deploys?|ships?|expires?|go(?:es)? out|happens?|scheduled|stores?|chose|chosen|decided|decision|targets?|requires?|defaults? to|written in|hosted on|will|should be)\b`)
 
 var valueTokenRe = regexp.MustCompile(`^[a-z0-9][a-z0-9.\-_/+]*$`)
 
@@ -156,7 +179,10 @@ func incompatible(a, b string) bool {
 		// subjects already matched.
 		return true
 	}
-	if !relationVerbs.MatchString(a) || !relationVerbs.MatchString(b) {
+	// Both claims must share a relation verb: "X deploys on Fridays" and
+	// "X is the TL" describe different relations of the same subject and
+	// can both hold.
+	if !sharedRelationVerb(a, b) {
 		return false
 	}
 	// Same relation skeleton, different values: strip shared tokens; if
@@ -166,6 +192,36 @@ func incompatible(a, b string) bool {
 	restA := diffValues(ta, tb)
 	restB := diffValues(tb, ta)
 	return len(restA) > 0 && len(restB) > 0
+}
+
+func sharedRelationVerb(a, b string) bool {
+	va := relationVerbs.FindAllString(strings.ToLower(a), -1)
+	vb := relationVerbs.FindAllString(strings.ToLower(b), -1)
+	if len(va) == 0 || len(vb) == 0 {
+		return false
+	}
+	set := map[string]bool{}
+	for _, v := range va {
+		set[verbLemma(v)] = true
+	}
+	for _, v := range vb {
+		if set[verbLemma(v)] {
+			return true
+		}
+	}
+	return false
+}
+
+// verbLemma folds trivial inflection so "prefer/prefers", "run on/runs
+// on" and "expire/expires" compare equal.
+func verbLemma(v string) string {
+	v = strings.TrimSpace(v)
+	fields := strings.Fields(v)
+	if len(fields) > 0 {
+		fields[0] = strings.TrimSuffix(strings.TrimSuffix(fields[0], "es"), "s")
+		v = strings.Join(fields, " ")
+	}
+	return v
 }
 
 func diffValues(a, b map[string]bool) []string {

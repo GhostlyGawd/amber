@@ -86,12 +86,12 @@ func Run(ctx context.Context, d Deps) error {
 	})
 
 	type recallArgs struct {
-		Query   string `json:"query" jsonschema:"what to look up"`
-		Limit   int    `json:"limit,omitempty" jsonschema:"max results, default 8"`
-		Entity  string `json:"entity,omitempty" jsonschema:"filter by entity name"`
-		Type    string `json:"type,omitempty" jsonschema:"filter by memory type"`
-		SinceDays int  `json:"since_days,omitempty" jsonschema:"only memories updated in the last N days"`
-		History bool   `json:"history,omitempty" jsonschema:"include superseded/tombstoned/quarantined (off by default)"`
+		Query     string `json:"query" jsonschema:"what to look up"`
+		Limit     int    `json:"limit,omitempty" jsonschema:"max results, default 8"`
+		Entity    string `json:"entity,omitempty" jsonschema:"filter by entity name"`
+		Type      string `json:"type,omitempty" jsonschema:"filter by memory type"`
+		SinceDays int    `json:"since_days,omitempty" jsonschema:"only memories updated in the last N days"`
+		History   bool   `json:"history,omitempty" jsonschema:"include superseded/tombstoned/quarantined (off by default)"`
 	}
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "memory_recall",

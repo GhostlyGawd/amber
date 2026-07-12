@@ -22,24 +22,24 @@ import (
 // The schema is published (docs/interchange-schema.json) as an open
 // format: any tool may produce or consume it.
 type Record struct {
-	Schema          string       `json:"schema"`
-	ID              string       `json:"id"`
-	Content         string       `json:"content"`
-	Type            string       `json:"type"`
-	Importance      int          `json:"importance"`
-	Trust           int          `json:"trust"`
-	Confidence      float64      `json:"confidence"`
-	Status          string       `json:"status"`
-	Scope           string       `json:"scope,omitempty"`
-	Source          string       `json:"source,omitempty"`
-	SessionID       string       `json:"session_id,omitempty"`
-	CreatedAt       string       `json:"created_at"`
-	UpdatedAt       string       `json:"updated_at"`
-	LastConfirmedAt string       `json:"last_confirmed_at,omitempty"`
-	SupersededBy    string       `json:"superseded_by,omitempty"`
-	Entities        []EntityRef  `json:"entities,omitempty"`
-	Tags            []string     `json:"tags,omitempty"`
-	ContentHash     string       `json:"content_hash"`
+	Schema          string      `json:"schema"`
+	ID              string      `json:"id"`
+	Content         string      `json:"content"`
+	Type            string      `json:"type"`
+	Importance      int         `json:"importance"`
+	Trust           int         `json:"trust"`
+	Confidence      float64     `json:"confidence"`
+	Status          string      `json:"status"`
+	Scope           string      `json:"scope,omitempty"`
+	Source          string      `json:"source,omitempty"`
+	SessionID       string      `json:"session_id,omitempty"`
+	CreatedAt       string      `json:"created_at"`
+	UpdatedAt       string      `json:"updated_at"`
+	LastConfirmedAt string      `json:"last_confirmed_at,omitempty"`
+	SupersededBy    string      `json:"superseded_by,omitempty"`
+	Entities        []EntityRef `json:"entities,omitempty"`
+	Tags            []string    `json:"tags,omitempty"`
+	ContentHash     string      `json:"content_hash"`
 }
 
 // EntityRef is an entity in interchange form.
@@ -60,22 +60,22 @@ type ScanReport struct {
 
 func toRecord(m *store.Memory) Record {
 	r := Record{
-		Schema:      version.InterchangeSchema,
-		ID:          m.ID,
-		Content:     m.Content,
-		Type:        m.Type,
-		Importance:  m.Importance,
-		Trust:       int(m.Trust),
-		Confidence:  m.Confidence,
-		Status:      m.Status,
-		Scope:       m.Scope,
-		Source:      m.Source,
-		SessionID:   m.SessionID,
-		CreatedAt:   m.CreatedAt.UTC().Format(time.RFC3339),
-		UpdatedAt:   m.UpdatedAt.UTC().Format(time.RFC3339),
+		Schema:       version.InterchangeSchema,
+		ID:           m.ID,
+		Content:      m.Content,
+		Type:         m.Type,
+		Importance:   m.Importance,
+		Trust:        int(m.Trust),
+		Confidence:   m.Confidence,
+		Status:       m.Status,
+		Scope:        m.Scope,
+		Source:       m.Source,
+		SessionID:    m.SessionID,
+		CreatedAt:    m.CreatedAt.UTC().Format(time.RFC3339),
+		UpdatedAt:    m.UpdatedAt.UTC().Format(time.RFC3339),
 		SupersededBy: m.SupersededBy,
-		Tags:        m.Tags,
-		ContentHash: m.ContentHash,
+		Tags:         m.Tags,
+		ContentHash:  m.ContentHash,
 	}
 	if !m.LastConfirmedAt.IsZero() {
 		r.LastConfirmedAt = m.LastConfirmedAt.UTC().Format(time.RFC3339)

@@ -55,7 +55,7 @@ func cmdStatus() *cobra.Command {
 			if flagFormat == "json" {
 				return jsonOut(map[string]any{
 					"version": version.Version, "store": e.Dir, "scope": e.Scope,
-					"counts": map[string]any{"status": byStatus, "type": byType, "trust": byTrust},
+					"counts":   map[string]any{"status": byStatus, "type": byType, "trust": byTrust},
 					"entities": len(ents), "pending_review": pendingCount,
 					"embedding": map[string]any{"provider": e.Config.Embedding.Provider, "active": embName, "store_model": modelID},
 					"digest":    map[string]any{"backend": e.Config.Digest.Backend, "posture": e.Config.Digest.Posture},
