@@ -1,0 +1,80 @@
+# goreleaser config — https://goreleaser.com
+# Release: git tag vX.Y.Z && goreleaser release --clean
+version: 2
+
+project_name: amber
+
+before:
+  hooks:
+    - go mod tidy
+    - go test ./internal/... -count=1
+
+builds:
+  - id: amber
+    main: ./cmd/amber
+    binary: amber
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X github.com/ghostlygawd/amber/internal/version.Version={{.Version}}
+      - -X github.com/ghostlygawd/amber/internal/version.Commit={{.ShortCommit}}
+      - -X github.com/ghostlygawd/amber/internal/version.Date={{.Date}}
+    goos: [darwin, linux]
+    goarch: [amd64, arm64]
+
+archives:
+  - id: amber
+    formats: [tar.gz]
+    name_template: "amber_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+      - AGENTS.md
+      - docs/**/*
+
+checksum:
+  name_template: "checksums.txt"
+
+sboms:
+  - artifacts: archive
+
+signs:
+  - cmd: cosign
+    args: ["sign-blob", "--yes", "--output-signature=${signature}", "${artifact}"]
+    artifacts: checksum
+    # Signing is opt-in at release time; remove this block if cosign is not configured.
+
+brews:
+  - name: amber
+    repository:
+      owner: ghostlygawd
+      name: homebrew-tap
+    homepage: "https://github.com/ghostlygawd/amber"
+    description: "Local-first, long-term memory for AI coding agents"
+    license: "MIT"
+    install: |
+      bin.install "amber"
+    test: |
+      system "#{bin}/amber", "--version"
+    caveats: |
+      Run `amber init` to create your store. Semantic recall wants a
+      one-time ~30MB local model: `amber doctor --fetch-model`.
+
+release:
+  draft: true
+  prerelease: auto
+  footer: |
+    Benchmarks (with losses), threat model, and the extraction prompt are
+    published in the repo. This is a provisional-name build — see
+    docs/naming.md.
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"

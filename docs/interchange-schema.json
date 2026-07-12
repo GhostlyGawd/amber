@@ -1,0 +1,82 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/ghostlygawd/amber/blob/main/docs/interchange-schema.json",
+  "title": "Amber memory interchange record (amber.v1)",
+  "description": "One JSON object per line (JSONL). An open interchange format for agent memory: any tool may produce or consume it. Published so it can become a shared standard rather than a lock-in.",
+  "type": "object",
+  "required": ["schema", "id", "content", "type", "trust", "status", "created_at", "updated_at", "content_hash"],
+  "additionalProperties": true,
+  "properties": {
+    "schema": {
+      "const": "amber.v1",
+      "description": "Format identifier. Consumers must reject unknown schema strings."
+    },
+    "id": {
+      "type": "string",
+      "description": "Stable identifier within the exporting store."
+    },
+    "content": {
+      "type": "string",
+      "description": "The memory as a declarative statement.",
+      "maxLength": 4000
+    },
+    "type": {
+      "type": "string",
+      "enum": ["fact", "preference", "decision", "event", "note"]
+    },
+    "importance": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5,
+      "default": 3
+    },
+    "trust": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 3,
+      "description": "0=user-stated, 1=user-approved, 2=auto-digest, 3=untrusted-origin. Importers MUST preserve tier; quarantined records stay quarantined."
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active", "superseded", "tombstoned", "quarantined", "aging"]
+    },
+    "scope": {
+      "type": "string",
+      "enum": ["global", "project", ""]
+    },
+    "source": { "type": "string" },
+    "session_id": { "type": "string" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "last_confirmed_at": { "type": "string", "format": "date-time" },
+    "superseded_by": {
+      "type": "string",
+      "description": "id of the memory that replaced this one, if any."
+    },
+    "entities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "type": { "type": "string", "enum": ["person", "project", "org", "other"] },
+          "aliases": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "content_hash": {
+      "type": "string",
+      "description": "sha256 hex of normalized content (lowercased, punctuation stripped, whitespace collapsed). Used for idempotent import."
+    }
+  }
+}
