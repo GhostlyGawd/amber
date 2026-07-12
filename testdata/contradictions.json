@@ -1,0 +1,25 @@
+{
+  "description": "Contradiction suite (§13 week-3 acceptance): 20 update pairs. Writing `a` then `b` must mark `a` superseded by `b` with zero hard deletions. Gate: ≥90% correct supersedence.",
+  "pairs": [
+    {"a": "Rhen prefers tabs for indentation.", "b": "Rhen prefers spaces for indentation.", "type": "preference", "entities": ["Rhen"]},
+    {"a": "The staging database is Postgres 15.", "b": "The staging database is Postgres 16.", "type": "fact"},
+    {"a": "Deploys go out on Fridays.", "b": "Deploys go out on Tuesdays.", "type": "decision"},
+    {"a": "The API rate limit is 100 requests per minute.", "b": "The API rate limit is 250 requests per minute.", "type": "fact"},
+    {"a": "Alice Chen works at Initech.", "b": "Alice Chen works at Globex now.", "type": "fact", "entities": ["Alice Chen"]},
+    {"a": "The project uses npm for package management.", "b": "The project uses pnpm for package management.", "type": "decision"},
+    {"a": "User prefers dark mode in all editors.", "b": "User prefers light mode in all editors.", "type": "preference"},
+    {"a": "The auth tokens expire after 24 hours.", "b": "The auth tokens expire after 15 minutes.", "type": "fact"},
+    {"a": "The team decided to use REST for the public API.", "b": "The team decided to use gRPC for the public API.", "type": "decision"},
+    {"a": "CI runs on CircleCI.", "b": "CI runs on GitHub Actions; the team migrated off CircleCI.", "type": "fact"},
+    {"a": "The default branch is master.", "b": "The default branch is main.", "type": "fact"},
+    {"a": "Rhen lives in Portland.", "b": "Rhen lives in Denver.", "type": "fact", "entities": ["Rhen"]},
+    {"a": "The billing service is written in Ruby.", "b": "The billing service is written in Go.", "type": "fact", "entities": ["billing-service"]},
+    {"a": "User prefers pytest for Python testing.", "b": "User prefers unittest for Python testing.", "type": "preference"},
+    {"a": "The retry budget is 3 attempts.", "b": "The retry budget is 5 attempts.", "type": "decision"},
+    {"a": "Standup is at 9:30 every morning.", "b": "Standup is at 10:00 every morning.", "type": "fact"},
+    {"a": "The cache TTL is set to 60 seconds.", "b": "The cache TTL is set to 300 seconds.", "type": "decision"},
+    {"a": "Production runs on AWS us-east-1.", "b": "Production runs on AWS eu-west-1.", "type": "fact"},
+    {"a": "The team uses Jira for issue tracking.", "b": "The team uses Linear for issue tracking; Jira was retired.", "type": "fact"},
+    {"a": "User prefers verbose commit messages with full context.", "b": "User prefers one-line commit messages.", "type": "preference"}
+  ]
+}

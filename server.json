@@ -1,0 +1,36 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
+  "name": "io.github.ghostlygawd/amber",
+  "description": "Local-first, long-term memory for AI coding agents. Trust-tiered, poisoning-resistant, offline, keyless. One SQLite file the user owns.",
+  "repository": {
+    "url": "https://github.com/ghostlygawd/amber",
+    "source": "github"
+  },
+  "version": "0.1.0",
+  "packages": [
+    {
+      "registryType": "go",
+      "identifier": "github.com/ghostlygawd/amber/cmd/amber",
+      "version": "0.1.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "runtimeHint": "Run `amber init --defaults` once before first use.",
+      "environmentVariables": [
+        {
+          "name": "AMBER_HOME",
+          "description": "Override the global store location (default ~/.amber).",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "AMBER_STORE",
+          "description": "Point at a specific store directory.",
+          "isRequired": false,
+          "isSecret": false
+        }
+      ]
+    }
+  ],
+  "remotes": []
+}
