@@ -73,11 +73,11 @@ amber remember "We deploy the billing service to Fly.io on Fridays" --type decis
 amber recall "where does billing deploy"
 ```
 
-![Sanitized Amber terminal demonstration showing initialization, a reviewed memory write, attributed recall, and local store status](docs/media/amber-terminal-demo.svg)
+![Sanitized Amber terminal demonstration showing initialization, a reviewed memory write, attributed recall, and local store status](web/assets/amber-terminal-demo.svg)
 
 *Recorded from merged source commit `d635a31c` on 2026-07-29.
 [Plain-text transcript](docs/media/amber-terminal-demo.txt) ·
-[capture provenance and open Week 0 gate](docs/evidence/2026-07-29-week0-and-terminal-demo-workpad.md).*
+[capture provenance and acquisition evidence](docs/evidence/2026-07-29-week0-and-terminal-demo-workpad.md).*
 
 ## Ten minutes to a store that already knows your project
 

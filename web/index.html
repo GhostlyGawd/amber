@@ -1,31 +1,35 @@
 <!DOCTYPE html>
-<html lang="en" data-headline="a">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Amber — reviewed memory for AI coding agents</title>
-<meta name="description" content="Your coding agent forgets everything between sessions. Amber is reviewed memory: it learns from your sessions, you approve what it keeps, and it's one local SQLite file you own.">
-<meta property="og:title" content="Amber — reviewed memory for AI coding agents">
-<meta property="og:description" content="Stop re-explaining your project every session — without letting agent memory rot. Local-first, reviewable, yours.">
+<title>Amber — one reviewed memory across AI coding agents</title>
+<meta name="description" content="Stop re-explaining your project every session. Amber keeps reviewed, portable memory in one local SQLite file you own.">
+<meta property="og:title" content="Amber — one reviewed memory across AI coding agents">
+<meta property="og:description" content="Reviewed, local-first memory you can use across coding agents. No Docker, API key, or account.">
 <meta property="og:type" content="website">
 <style>
   :root {
     --cream: #FFFBEB; --paper: #FFF7E0; --ink: #2A2420; --faint: #7A6E5F;
-    --amber: #B45309; --amber-bright: #D97706; --rule: #E7D9BE; --code-bg: #FDF3D8;
+    --amber: #B45309; --amber-bright: #D97706; --on-amber: #FFFBEB;
+    --rule: #E7D9BE; --code-bg: #FDF3D8;
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --cream: #17130E; --paper: #1E1811; --ink: #EDE4D3; --faint: #A89B86;
-      --amber: #F59E0B; --amber-bright: #FBBF24; --rule: #322A1E; --code-bg: #211A11;
+      --amber: #F59E0B; --amber-bright: #FBBF24; --on-amber: #17130E;
+      --rule: #322A1E; --code-bg: #211A11;
     }
   }
   :root[data-theme="dark"] {
     --cream: #17130E; --paper: #1E1811; --ink: #EDE4D3; --faint: #A89B86;
-    --amber: #F59E0B; --amber-bright: #FBBF24; --rule: #322A1E; --code-bg: #211A11;
+    --amber: #F59E0B; --amber-bright: #FBBF24; --on-amber: #17130E;
+    --rule: #322A1E; --code-bg: #211A11;
   }
   :root[data-theme="light"] {
     --cream: #FFFBEB; --paper: #FFF7E0; --ink: #2A2420; --faint: #7A6E5F;
-    --amber: #B45309; --amber-bright: #D97706; --rule: #E7D9BE; --code-bg: #FDF3D8;
+    --amber: #B45309; --amber-bright: #D97706; --on-amber: #FFFBEB;
+    --rule: #E7D9BE; --code-bg: #FDF3D8;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
@@ -46,22 +50,30 @@
     display: inline-block; padding: 10px 18px; border-radius: 8px; font-size: 15px;
     text-decoration: none; border: 1px solid var(--rule); color: var(--ink); background: var(--paper);
   }
-  .btn.primary { background: var(--amber); border-color: var(--amber); color: #FFFBEB; font-weight: 600; }
+  .btn.primary { background: var(--amber); border-color: var(--amber); color: var(--on-amber); font-weight: 600; }
   .btn:hover { border-color: var(--amber); }
-  .installline {
-    display: flex; align-items: center; gap: 10px; margin: 14px 0 0; padding: 10px 14px;
-    background: var(--code-bg); border: 1px solid var(--rule); border-radius: 8px;
-    font-size: 13.5px; overflow-x: auto; white-space: nowrap;
+  .btn:focus-visible, .installline button:focus-visible, a:focus-visible {
+    outline: 3px solid var(--amber-bright); outline-offset: 3px;
   }
+  .installline {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px;
+    margin: 14px 0 0; padding: 10px 14px;
+    background: var(--code-bg); border: 1px solid var(--rule); border-radius: 8px;
+    font-size: 13.5px;
+  }
+  .installline code { min-width: 0; overflow-wrap: anywhere; white-space: normal; }
   .installline button {
     flex: none; font-size: 12px; border: 1px solid var(--rule); background: var(--paper);
-    color: var(--faint); border-radius: 6px; padding: 4px 8px; cursor: pointer;
+    color: var(--faint); border-radius: 6px; min-height: 36px; padding: 6px 10px; cursor: pointer;
   }
   .frame { font-size: 17px; margin: 34px 0; padding: 18px 22px; border-left: 3px solid var(--amber); background: var(--paper); border-radius: 0 6px 6px 0; }
   .frame b { color: var(--amber); font-weight: 600; }
   pre { background: var(--code-bg); border: 1px solid var(--rule); border-radius: 8px; padding: 16px 18px; overflow-x: auto; font-size: 14.5px; }
   pre .c { color: var(--faint); }
   pre .p { color: var(--amber); }
+  .demo { margin: 24px 0 0; }
+  .demo img { display: block; width: 100%; height: auto; border: 1px solid var(--rule); border-radius: 8px; }
+  .demo figcaption { margin-top: 10px; color: var(--faint); font-size: 14px; }
   h2 { font-size: 14px; letter-spacing: .16em; text-transform: uppercase; color: var(--faint); margin: 56px 0 18px; font-weight: 600; }
   .pain { margin: 0 0 22px; }
   .pain h3 { font-size: 18px; margin: 0 0 6px; font-weight: 600; }
@@ -85,30 +97,30 @@
   footer { color: var(--faint); font-size: 14px; padding: 8px 0 72px; }
   footer a { color: var(--amber); }
   a { color: var(--amber); }
-  [data-headline="b"] .hl-a { display: none; }
-  [data-headline="a"] .hl-b { display: none; }
+  @media (max-width: 520px) {
+    header { padding-top: 48px; }
+    .cta { display: grid; grid-template-columns: 1fr; }
+    .btn { display: block; min-height: 44px; text-align: center; }
+    .installline { grid-template-columns: 1fr; }
+    .installline button { min-height: 44px; width: 100%; }
+  }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
     <div class="brand">Amber</div>
-    <!-- Preview-only headline variants for the unrun Week-0 smoke test.
-         ?v=a or ?v=b forces a variant. This page has no analytics or waitlist. -->
-    <h1 class="hl-a">One memory across every agent.</h1>
-    <h1 class="hl-b">Memory that doesn't rot.</h1>
-    <p class="sub">Every session, your coding agent starts from zero — so you explain
-    your project <em>again</em>. Amber is <b>reviewed memory</b>: it learns from your
-    sessions, <b>you approve what it keeps</b>, and everything lives in one local
-    SQLite file you own. No Docker, no API key, no account.</p>
+    <h1>One reviewed memory across every agent.</h1>
+    <p class="sub">Stop re-explaining your project every session. Amber remembers
+    durable decisions, preferences, and corrections in one local SQLite file.
+    <b>You approve what it keeps.</b> No Docker, API key, or account.</p>
     <div class="cta">
-      <a class="btn primary" href="https://github.com/ghostlygawd/amber#install">Build Amber</a>
-      <a class="btn" href="https://github.com/ghostlygawd/amber">Star on GitHub</a>
-      <a class="btn" href="https://github.com/ghostlygawd/amber/blob/main/docs/benchmarks.md">Benchmarks, with losses</a>
+      <a class="btn primary" href="#install">Try Amber locally</a>
+      <a class="btn" href="#demo">See the real demo</a>
     </div>
-    <div class="installline mono">
-      <span id="install-cmd">go install github.com/ghostlygawd/amber/cmd/amber@latest</span>
-      <button onclick="navigator.clipboard.writeText(document.getElementById('install-cmd').textContent).then(()=>{this.textContent='copied'})">copy</button>
+    <div class="installline mono" id="install">
+      <code id="install-cmd">go install github.com/ghostlygawd/amber/cmd/amber@latest</code>
+      <button id="copy-install" type="button" aria-label="Copy install command" aria-live="polite">copy</button>
     </div>
   </header>
 
@@ -140,7 +152,7 @@
     Memory is what it <b>learns</b> (Amber) — reviewed by you.
   </div>
 
-  <h2>Two minutes to your first memory</h2>
+  <h2 id="quickstart">Two minutes to your first memory</h2>
   <pre class="mono"><span class="p">amber</span> init
 <span class="p">amber</span> remember "We deploy billing to Fly.io on Fridays" --type decision
 <span class="p">amber</span> recall "where does billing deploy"
@@ -149,6 +161,15 @@
 <span class="c"># built from session history you already have, then reviewed by you</span>
 <span class="p">amber</span> digest --transcripts 30d
 <span class="p">amber</span> review</pre>
+
+  <figure class="demo" id="demo">
+    <a href="https://github.com/ghostlygawd/amber#two-minutes-to-your-first-memory">
+      <img src="assets/amber-terminal-demo.svg" alt="Amber terminal session showing initialization, a saved deployment decision, attributed recall, and local store status">
+    </a>
+    <figcaption>Real Amber output from a clean local build, with the path sanitized.
+      <a href="https://github.com/ghostlygawd/amber/blob/main/docs/media/amber-terminal-demo.txt">Read the plain-text transcript and provenance.</a>
+    </figcaption>
+  </figure>
 
   <h2>How it kills each problem</h2>
   <ul class="diff">
@@ -199,17 +220,32 @@ ignored the small talk.</pre>
   </footer>
 </div>
 <script>
-  // Headline variant: ?v=a|b wins; else sticky random assignment.
-  (function () {
-    var q = new URLSearchParams(location.search).get('v');
-    var v = (q === 'a' || q === 'b') ? q : null;
-    try {
-      if (!v) v = localStorage.getItem('amber-hl');
-      if (!v) { v = Math.random() < 0.5 ? 'a' : 'b'; }
-      localStorage.setItem('amber-hl', v);
-    } catch (e) { v = v || 'a'; }
-    document.documentElement.dataset.headline = v;
-  })();
+  var copyButton = document.getElementById('copy-install');
+  var installCommand = document.getElementById('install-cmd');
+
+  function selectInstallCommand() {
+    var range = document.createRange();
+    range.selectNodeContents(installCommand);
+    window.getSelection().removeAllRanges();
+    window.getSelection().addRange(range);
+    copyButton.textContent = 'command selected';
+    copyButton.setAttribute('aria-label', 'Copy unavailable; install command selected');
+  }
+
+  copyButton.addEventListener('click', function () {
+    if (!navigator.clipboard || !navigator.clipboard.writeText) {
+      selectInstallCommand();
+      return;
+    }
+    navigator.clipboard.writeText(installCommand.textContent).then(function () {
+      copyButton.textContent = 'copied';
+      copyButton.setAttribute('aria-label', 'Install command copied');
+      window.setTimeout(function () {
+        copyButton.textContent = 'copy';
+        copyButton.setAttribute('aria-label', 'Copy install command');
+      }, 2000);
+    }).catch(selectInstallCommand);
+  });
 </script>
 </body>
 </html>
