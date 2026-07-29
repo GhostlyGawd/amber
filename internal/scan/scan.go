@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"math"
 	"regexp"
+	"sort"
 	"strings"
 )
 
@@ -113,7 +114,14 @@ func Scan(content string) []Finding {
 		}
 	}
 	// Dedupe overlapping findings (keep the earliest/most specific).
-	return dedupe(out)
+	out = dedupe(out)
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].Start != out[j].Start {
+			return out[i].Start < out[j].Start
+		}
+		return out[i].End < out[j].End
+	})
+	return out
 }
 
 // Redact replaces secret spans with [redacted:<kind>]. PII spans are left
@@ -128,16 +136,45 @@ func RedactAll(content string, findings []Finding) string {
 }
 
 func redactWhere(content string, findings []Finding, want func(Finding) bool) string {
-	if len(findings) == 0 {
-		return content
-	}
-	// Replace back-to-front so offsets stay valid.
-	fs := append([]Finding(nil), findings...)
-	for i := len(fs) - 1; i >= 0; i-- {
-		f := fs[i]
+	spans := make([]Finding, 0, len(findings))
+	for _, f := range findings {
 		if !want(f) || f.Start < 0 || f.End > len(content) || f.Start >= f.End {
 			continue
 		}
+		spans = append(spans, f)
+	}
+
+	if len(spans) == 0 {
+		return content
+	}
+	sort.SliceStable(spans, func(i, j int) bool {
+		if spans[i].Start != spans[j].Start {
+			return spans[i].Start < spans[j].Start
+		}
+		return spans[i].End > spans[j].End
+	})
+
+	// Merge overlapping spans before replacement. Findings can overlap when
+	// a provider-specific token also matches the generic assigned-credential
+	// rule. Replacing either span first would invalidate the other's offsets.
+	merged := make([]Finding, 0, len(spans))
+	for _, f := range spans {
+		if len(merged) == 0 || f.Start >= merged[len(merged)-1].End {
+			merged = append(merged, f)
+			continue
+		}
+		last := &merged[len(merged)-1]
+		if f.End > last.End {
+			last.End = f.End
+		}
+		if last.Kind != f.Kind {
+			last.Kind = "multiple"
+		}
+	}
+
+	// Replace back-to-front so source offsets stay valid.
+	for i := len(merged) - 1; i >= 0; i-- {
+		f := merged[i]
 		content = content[:f.Start] + "[redacted:" + f.Kind + "]" + content[f.End:]
 	}
 	return content

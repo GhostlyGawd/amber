@@ -14,8 +14,9 @@ they are not great, they say so.
 - Harness: `internal/suites/recall_test.go`
 - Data: `testdata/recall_suite.json` — 54 planted memories, 50 queries
   mixing exact keywords and paraphrase.
-- Embedder: the **offline floor** (deterministic hash + BM25). The local
-  static model can only improve on this.
+- Embedder: the deterministic hash + BM25 configuration. Treat this as one
+  measured configuration, not a lower bound: a different local model can win
+  or lose on individual queries and requires its own recorded run.
 
 | Metric | Result | Gate |
 |---|---|---|
@@ -83,8 +84,9 @@ go run ./eval/longmemeval \
 ```
 
 The output JSON contains per-question results **including every loss**,
-the seed, and recall-latency percentiles. We publish the results file
-alongside each tagged release; we do not cherry-pick question types.
+the seed, and recall-latency percentiles. No tagged release exists yet. A
+future release must attach its complete results file before making a benchmark
+claim; question types must not be cherry-picked.
 
 ## What the evidence against context files actually says
 

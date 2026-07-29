@@ -28,7 +28,7 @@ type recallSuite struct {
 
 // TestRecallSuite (§14): ≥80% top-3 on the internal 50-query set,
 // CI-gated. Runs on the offline floor (hash embedder + BM25); the local
-// model can only improve on these numbers.
+// model requires a separate measured run; it is not assumed to improve them.
 func TestRecallSuite(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join("..", "..", "testdata", "recall_suite.json"))
 	if err != nil {

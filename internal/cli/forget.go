@@ -7,6 +7,7 @@ import (
 
 	"github.com/ghostlygawd/amber/internal/search"
 	"github.com/ghostlygawd/amber/internal/store"
+	"github.com/ghostlygawd/amber/internal/trust"
 )
 
 func cmdForget() *cobra.Command {
@@ -17,9 +18,9 @@ func cmdForget() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "forget [id]",
 		Short: "Soft-delete memories (tombstone; reversible with restore)",
-		Long: `Tombstone a memory by id, by query, or every memory linked to an entity
-(--entity — the right-to-erasure primitive). Tombstones are excluded from
-recall and injection but the rows remain; ` + "`amber restore <id>`" + ` reverses.`,
+		Long: `Tombstone a memory by id, by query, or every memory linked to an entity.
+This is reversible soft deletion: tombstones are excluded from recall and
+injection, but their rows remain; ` + "`amber restore <id>`" + ` reverses it.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			e, err := openEnv()
@@ -122,14 +123,22 @@ func cmdRestore() *cobra.Command {
 			case store.StatusSuperseded:
 				return fmt.Errorf("%s was superseded by %s; forget the newer one instead if it is wrong", shortID(m.ID), shortID(m.SupersededBy))
 			}
-			if err := e.Store.SetStatus(m.ID, store.StatusActive, store.OpRestore, map[string]any{"from": m.Status}); err != nil {
+			target := restoreTargetStatus(m)
+			if err := e.Store.SetStatus(m.ID, target, store.OpRestore, map[string]any{"from": m.Status}); err != nil {
 				return err
 			}
-			fmt.Printf("restored %s to active (was %s)\n", shortID(m.ID), m.Status)
+			fmt.Printf("restored %s to %s (was %s)\n", shortID(m.ID), target, m.Status)
 			return nil
 		},
 	}
 	return c
+}
+
+func restoreTargetStatus(m *store.Memory) string {
+	if m.Trust == trust.T3 {
+		return store.StatusQuarantined
+	}
+	return store.StatusActive
 }
 
 func plural(n int, one, many string) string {

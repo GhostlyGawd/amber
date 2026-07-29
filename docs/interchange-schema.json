@@ -34,7 +34,7 @@
       "type": "integer",
       "minimum": 0,
       "maximum": 3,
-      "description": "0=user-stated, 1=user-approved, 2=auto-digest, 3=untrusted-origin. Importers MUST preserve tier; quarantined records stay quarantined."
+      "description": "0=user-stated, 1=user-approved, 2=auto-digest, 3=untrusted-origin. Importers MUST preserve tier. A T3 record marked active or aging is imported as quarantined; only review can activate it."
     },
     "confidence": {
       "type": "number",
@@ -56,7 +56,7 @@
     "last_confirmed_at": { "type": "string", "format": "date-time" },
     "superseded_by": {
       "type": "string",
-      "description": "id of the memory that replaced this one, if any."
+      "description": "ID of the memory that replaced this one. Amber import remaps this reference if an ID collision occurs."
     },
     "entities": {
       "type": "array",
@@ -76,7 +76,7 @@
     },
     "content_hash": {
       "type": "string",
-      "description": "sha256 hex of normalized content (lowercased, punctuation stripped, whitespace collapsed). Used for idempotent import."
+      "description": "SHA-256 hex of normalized content (lowercased, punctuation stripped, whitespace collapsed). Import rejects a mismatch and uses the value for idempotence."
     }
   }
 }

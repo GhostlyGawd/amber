@@ -93,9 +93,8 @@
 <div class="wrap">
   <header>
     <div class="brand">Amber</div>
-    <!-- Headline variants for the Week-0 smoke test (docs/week0-gate.md).
-         Assignment: ?v=a / ?v=b forces a variant; otherwise random once, persisted.
-         Wire your analytics to document.documentElement.dataset.headline. -->
+    <!-- Preview-only headline variants for the unrun Week-0 smoke test.
+         ?v=a or ?v=b forces a variant. This page has no analytics or waitlist. -->
     <h1 class="hl-a">One memory across every agent.</h1>
     <h1 class="hl-b">Memory that doesn't rot.</h1>
     <p class="sub">Every session, your coding agent starts from zero — so you explain
@@ -103,12 +102,12 @@
     sessions, <b>you approve what it keeps</b>, and everything lives in one local
     SQLite file you own. No Docker, no API key, no account.</p>
     <div class="cta">
-      <a class="btn primary" href="https://github.com/ghostlygawd/amber#install">Install Amber</a>
+      <a class="btn primary" href="https://github.com/ghostlygawd/amber#install">Build Amber</a>
       <a class="btn" href="https://github.com/ghostlygawd/amber">Star on GitHub</a>
       <a class="btn" href="https://github.com/ghostlygawd/amber/blob/main/docs/benchmarks.md">Benchmarks, with losses</a>
     </div>
     <div class="installline mono">
-      <span id="install-cmd">curl -fsSL https://raw.githubusercontent.com/ghostlygawd/amber/main/install.sh | sh</span>
+      <span id="install-cmd">go install github.com/ghostlygawd/amber/cmd/amber@latest</span>
       <button onclick="navigator.clipboard.writeText(document.getElementById('install-cmd').textContent).then(()=>{this.textContent='copied'})">copy</button>
     </div>
   </header>

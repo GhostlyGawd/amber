@@ -149,18 +149,17 @@ func (w *Writer) Write(in Input) (*Outcome, error) {
 			}
 		}
 	}
-	var ents []store.Entity
+	aliasName, aliasEmail := entityx.EmailAlias(content)
+	if aliasName != "" {
+		entNames[aliasName] = "person"
+	}
+	ents := make([]store.Entity, 0, len(entNames))
 	for n, t := range entNames {
-		e, err := w.Store.EnsureEntity(n, t)
-		if err != nil {
-			return nil, err
+		e := store.Entity{Name: n, Type: t}
+		if strings.EqualFold(n, aliasName) && aliasEmail != "" {
+			e.Aliases = []string{aliasEmail}
 		}
 		ents = append(ents, e)
-	}
-	if name, email := entityx.EmailAlias(content); name != "" {
-		if e, err := w.Store.EnsureEntity(name, "person"); err == nil {
-			_ = w.Store.AddAlias(e.ID, email)
-		}
 	}
 	entNameList := make([]string, 0, len(ents))
 	for _, e := range ents {
@@ -168,77 +167,15 @@ func (w *Writer) Write(in Input) (*Outcome, error) {
 	}
 
 	// 4. Embed (nil embedder = lexical floor; belief falls back to token
-	// overlap). The first embedded write pins the model identity in meta;
-	// mixed-model stores are refused at open (§6).
+	// overlap). The atomic write pins the model identity with the mutation.
 	var vec []float32
-	if w.Embedder != nil {
+	if w.Embedder != nil && !in.Quarantine && in.Trust != trust.T3 {
 		v, err := w.Embedder.Embed(content)
 		if err == nil {
 			vec = v
-			if pinned, _ := w.Store.GetMeta(store.MetaEmbeddingModel); pinned == "" {
-				_ = w.Store.SetMeta(store.MetaEmbeddingModel, w.Embedder.Name())
-				_ = w.Store.SetMeta(store.MetaEmbeddingDims, fmt.Sprint(w.Embedder.Dims()))
-			}
 		}
 	}
 
-	// 5. Belief adjudication against similar actives (skip for quarantined
-	// writes: they are not beliefs yet).
-	if !in.Quarantine && in.Status == "" {
-		candidates := w.adjudicationPool()
-		dec := belief.Adjudicate(content, vec, entNameList, candidates)
-		switch dec.Verdict {
-		case belief.VerdictDuplicate:
-			if err := w.Store.Reconfirm(dec.Existing.ID, in.Importance); err != nil {
-				return nil, err
-			}
-			m, err := w.Store.Get(dec.Existing.ID)
-			if err != nil {
-				return nil, err
-			}
-			out.Action = "reconfirmed"
-			out.Memory = m
-			return out, nil
-		case belief.VerdictSupersedes:
-			m, err := w.insert(in, content, memType, ents, vec)
-			if err != nil {
-				return nil, err
-			}
-			if err := w.Store.Supersede(dec.Existing.ID, m.ID); err != nil {
-				return nil, err
-			}
-			out.Action = "superseded"
-			out.Memory = m
-			out.Superseded = dec.Existing
-			return out, nil
-		case belief.VerdictAmbiguous:
-			m, err := w.insert(in, content, memType, ents, vec)
-			if err != nil {
-				return nil, err
-			}
-			_ = w.Store.AddFlag(m.ID, store.FlagAmbiguity,
-				fmt.Sprintf("possibly contradicts %s: %q — %s", dec.Existing.ID, truncate(dec.Existing.Content, 120), dec.Reason))
-			out.Action = "created"
-			out.Memory = m
-			out.Ambiguous = dec.Existing
-			return out, nil
-		}
-	}
-
-	m, err := w.insert(in, content, memType, ents, vec)
-	if err != nil {
-		return nil, err
-	}
-	if in.Quarantine {
-		out.Action = "quarantined"
-	} else {
-		out.Action = "created"
-	}
-	out.Memory = m
-	return out, nil
-}
-
-func (w *Writer) insert(in Input, content, memType string, ents []store.Entity, vec []float32) (*store.Memory, error) {
 	status := in.Status
 	if status == "" {
 		status = store.StatusActive
@@ -267,34 +204,51 @@ func (w *Writer) insert(in Input, content, memType string, ents []store.Entity, 
 	if m.Importance == 0 {
 		m.Importance = 3
 	}
-	if err := w.Store.Insert(m, ents, in.Tags); err != nil {
-		return nil, err
-	}
+	reason := in.QuarantineReason
 	if status == store.StatusQuarantined {
-		reason := in.QuarantineReason
 		if reason == "" {
 			reason = "untrusted origin (trust tier T3)"
 		}
-		kind := in.QuarantineFlagKind
-		if kind == "" {
-			kind = store.FlagTainted
+	}
+	req := store.AtomicWriteRequest{
+		Memory: m, Entities: ents, Tags: in.Tags,
+		QuarantineReason: reason, QuarantineFlagKind: in.QuarantineFlagKind,
+	}
+	if w.Embedder != nil && len(vec) > 0 {
+		req.EmbeddingModel = w.Embedder.Name()
+		req.EmbeddingDims = w.Embedder.Dims()
+	}
+	if !in.Quarantine && in.Status == "" {
+		req.Decide = func(candidates []*store.Memory) store.WriteDecision {
+			decision := belief.Adjudicate(content, vec, entNameList, candidates)
+			result := store.WriteDecision{Kind: store.WriteNew}
+			switch decision.Verdict {
+			case belief.VerdictDuplicate:
+				result.Kind = store.WriteDuplicate
+			case belief.VerdictSupersedes:
+				result.Kind = store.WriteSupersedes
+			case belief.VerdictAmbiguous:
+				result.Kind = store.WriteAmbiguous
+				result.FlagDetail = fmt.Sprintf("possibly contradicts %s: %q — %s",
+					decision.Existing.ID, truncate(decision.Existing.Content, 120), decision.Reason)
+			}
+			if decision.Existing != nil {
+				result.ExistingID = decision.Existing.ID
+			}
+			return result
 		}
-		_ = w.Store.AddFlag(m.ID, kind, reason)
-		_ = w.Store.AppendOp(store.OpQuarantine, m.ID, map[string]any{"reason": reason})
 	}
-	return m, nil
-}
-
-// adjudicationPool returns the actives the belief engine compares a new
-// claim against. Adjudicate ranks by similarity itself; the pool is capped
-// to bound write-time cost on very large stores.
-func (w *Writer) adjudicationPool() []*store.Memory {
-	pool, err := w.Store.List(store.ListFilter{Statuses: []string{store.StatusActive, store.StatusAging}, Limit: 5000})
+	result, err := w.Store.AtomicWrite(req)
 	if err != nil {
-		return nil
+		return nil, err
 	}
-	_ = w.Store.AttachEntities(pool)
-	return pool
+	out.Action = result.Action
+	out.Memory = result.Memory
+	if result.Action == "superseded" {
+		out.Superseded = result.Existing
+	}
+	out.Ambiguous = result.Ambiguous
+	return out, nil
 }
 
 func truncate(s string, n int) string {

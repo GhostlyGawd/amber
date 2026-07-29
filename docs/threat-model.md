@@ -30,7 +30,11 @@ Every memory records where it came from, not how true it is:
 | **T2** | auto-digested from clean dialogue | yes (posture-dependent) |
 | **T3** | derived from tool / web output | **never, until reviewed** |
 
-T3 is quarantined on write. Review promotes it to T1. A memory's tier
+T3 is quarantined on write. MCP writes also fail closed: omitted provenance,
+dialogue-derived inferences, tool output, and web content enter quarantine.
+Only a verbatim user statement can enter as T0 through MCP. Restoring a T3
+record keeps it quarantined; review is the only transition that promotes it to
+T1 and activates it. A memory's tier
 modulates its retrieval rank (T0 outranks T2 when otherwise equal) but
 tier is about *trust of origin*, and injection eligibility is a hard
 gate, not a soft weight.

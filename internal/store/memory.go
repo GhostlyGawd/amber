@@ -159,7 +159,52 @@ func (s *Store) UpdateContent(id, newContent, reason string) error {
 	return tx.Commit()
 }
 
-// SetEmbedding stores a vector for one memory.
+// EmbeddingUpdate is one vector replacement in an embedding-model migration.
+type EmbeddingUpdate struct {
+	ID     string
+	Vector []float32
+}
+
+// ReplaceEmbeddings atomically replaces searchable vectors and pins their model.
+// Non-searchable rows have their vectors cleared so a migration does not send
+// quarantined or tombstoned content to a provider or retain mixed-model data.
+func (s *Store) ReplaceEmbeddings(updates []EmbeddingUpdate, model string, dims int) error {
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`UPDATE memories SET embedding=NULL`); err != nil {
+		return err
+	}
+	for _, update := range updates {
+		result, err := tx.Exec(`UPDATE memories SET embedding=? WHERE id=? AND status IN ('active','aging')`, EncodeVector(update.Vector), update.ID)
+		if err != nil {
+			return err
+		}
+		changed, err := result.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if changed != 1 {
+			return fmt.Errorf("replace embedding: active or aging memory %s not found", update.ID)
+		}
+	}
+	for key, value := range map[string]string{
+		MetaEmbeddingModel: model,
+		MetaEmbeddingDims:  fmt.Sprint(dims),
+	} {
+		if _, err := tx.Exec(`INSERT INTO meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`, key, value); err != nil {
+			return err
+		}
+	}
+	if err := appendOpTx(tx, OpReembed, "", map[string]any{"model": model, "count": len(updates)}); err != nil {
+		// SetEmbedding stores a vector for one memory.
+		return err
+	}
+	return tx.Commit()
+}
+
 func (s *Store) SetEmbedding(id string, v []float32) error {
 	_, err := s.DB.Exec(`UPDATE memories SET embedding=? WHERE id=?`, EncodeVector(v), id)
 	return err

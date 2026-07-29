@@ -15,6 +15,7 @@ import (
 
 	"github.com/ghostlygawd/amber/internal/scan"
 	"github.com/ghostlygawd/amber/internal/store"
+	"github.com/ghostlygawd/amber/internal/trust"
 	"github.com/ghostlygawd/amber/internal/version"
 )
 
@@ -75,7 +76,7 @@ func toRecord(m *store.Memory) Record {
 		UpdatedAt:    m.UpdatedAt.UTC().Format(time.RFC3339),
 		SupersededBy: m.SupersededBy,
 		Tags:         m.Tags,
-		ContentHash:  m.ContentHash,
+		ContentHash:  store.HashContent(m.Content),
 	}
 	if !m.LastConfirmedAt.IsZero() {
 		r.LastConfirmedAt = m.LastConfirmedAt.UTC().Format(time.RFC3339)
@@ -223,11 +224,23 @@ type ImportResult struct {
 	Errors   []string
 }
 
-// ImportJSONL reads amber.v1 records and inserts them via insert(),
-// preserving tiers, statuses, and timestamps. Records whose content hash
-// already exists are skipped.
-func ImportJSONL(r io.Reader, s *store.Store, insert func(Record) error) (*ImportResult, error) {
+// ImportJSONL reads and validates a complete amber.v1 stream, then imports it
+// atomically. IDs, tiers, statuses, timestamps, supersedence, aliases, and tags
+// are preserved. Records whose content hash already exists are skipped.
+func ImportJSONL(r io.Reader, s *store.Store) (*ImportResult, error) {
 	res := &ImportResult{}
+	type pendingImport struct {
+		record   Record
+		line     int
+		memory   *store.Memory
+		entities []store.Entity
+	}
+	var pending []pendingImport
+	idMap := make(map[string]string)
+	seenHashes := make(map[string]string)
+	usedIDs := make(map[string]bool)
+
+	seenOriginalIDs := make(map[string]bool)
 	sc := bufio.NewScanner(r)
 	sc.Buffer(make([]byte, 0, 1024*1024), 1024*1024)
 	line := 0
@@ -243,27 +256,176 @@ func ImportJSONL(r io.Reader, s *store.Store, insert func(Record) error) (*Impor
 			res.Errors = append(res.Errors, fmt.Sprintf("line %d: %v", line, err))
 			continue
 		}
-		if rec.Schema != "" && rec.Schema != version.InterchangeSchema {
+		if rec.Schema != version.InterchangeSchema {
 			res.Errors = append(res.Errors, fmt.Sprintf("line %d: unsupported schema %q", line, rec.Schema))
 			continue
 		}
+		if strings.TrimSpace(rec.ID) == "" {
+			res.Errors = append(res.Errors, fmt.Sprintf("line %d: empty id", line))
+			continue
+		}
+		if seenOriginalIDs[rec.ID] {
+			res.Errors = append(res.Errors, fmt.Sprintf("line %d: duplicate id %q", line, rec.ID))
+			continue
+		}
+		seenOriginalIDs[rec.ID] = true
 		if strings.TrimSpace(rec.Content) == "" {
 			res.Errors = append(res.Errors, fmt.Sprintf("line %d: empty content", line))
 			continue
 		}
-		existing, err := s.FindByHash(store.HashContent(rec.Content))
+		if !store.ValidType(rec.Type) {
+			res.Errors = append(res.Errors, fmt.Sprintf("line %d: bad type %q", line, rec.Type))
+			continue
+		}
+		tier := trust.Tier(rec.Trust)
+		if !tier.Valid() {
+			res.Errors = append(res.Errors, fmt.Sprintf("line %d: bad trust tier %d", line, rec.Trust))
+			continue
+		}
+		if rec.Scope != "" && rec.Scope != "global" && rec.Scope != "project" {
+			res.Errors = append(res.Errors, fmt.Sprintf("line %d: bad scope %q", line, rec.Scope))
+			continue
+		}
+		if !validImportStatus(rec.Status) {
+			res.Errors = append(res.Errors, fmt.Sprintf("line %d: bad status %q", line, rec.Status))
+			continue
+		}
+		created, err := parseImportTime(rec.CreatedAt, true)
+		if err != nil {
+			res.Errors = append(res.Errors, fmt.Sprintf("line %d: created_at: %v", line, err))
+			continue
+		}
+		updated, err := parseImportTime(rec.UpdatedAt, true)
+		if err != nil {
+			res.Errors = append(res.Errors, fmt.Sprintf("line %d: updated_at: %v", line, err))
+			continue
+		}
+		confirmed, err := parseImportTime(rec.LastConfirmedAt, false)
+		if err != nil {
+			res.Errors = append(res.Errors, fmt.Sprintf("line %d: last_confirmed_at: %v", line, err))
+			continue
+		}
+		entities := make([]store.Entity, 0, len(rec.Entities))
+		badEntity := false
+		for _, entity := range rec.Entities {
+			entity.Name = strings.TrimSpace(entity.Name)
+			if entity.Type == "" {
+				entity.Type = "other"
+			}
+			if entity.Name == "" || (entity.Type != "person" && entity.Type != "project" && entity.Type != "org" && entity.Type != "other") {
+				res.Errors = append(res.Errors, fmt.Sprintf("line %d: invalid entity name or type", line))
+				badEntity = true
+				break
+			}
+			entities = append(entities, store.Entity{Name: entity.Name, Type: entity.Type, Aliases: entity.Aliases})
+		}
+		if badEntity {
+			continue
+		}
+		hash := store.HashContent(rec.Content)
+		if rec.ContentHash != hash {
+			res.Errors = append(res.Errors, fmt.Sprintf("line %d: content_hash does not match content", line))
+			continue
+		}
+		if actual, ok := seenHashes[hash]; ok {
+			idMap[rec.ID] = actual
+			res.Skipped++
+			continue
+		}
+		existing, err := s.FindByHash(hash)
 		if err != nil {
 			return res, err
 		}
 		if existing != nil {
+			idMap[rec.ID] = existing.ID
+			seenHashes[hash] = existing.ID
 			res.Skipped++
 			continue
 		}
-		if err := insert(rec); err != nil {
-			res.Errors = append(res.Errors, fmt.Sprintf("line %d: %v", line, err))
+		actualID := rec.ID
+		var collision int
+		if err := s.DB.QueryRow(`SELECT COUNT(*) FROM memories WHERE id=?`, actualID).Scan(&collision); err != nil {
+			return res, err
+		}
+		if collision > 0 || usedIDs[actualID] {
+			actualID = store.NewID()
+		}
+		usedIDs[actualID] = true
+		idMap[rec.ID] = actualID
+		seenHashes[hash] = actualID
+		status := rec.Status
+		if tier == trust.T3 && (status == store.StatusActive || status == store.StatusAging) {
+			status = store.StatusQuarantined
+		}
+		importance := rec.Importance
+		if importance == 0 {
+			importance = 3
+		}
+		if importance < 1 || importance > 5 || rec.Confidence < 0 || rec.Confidence > 1 {
+			res.Errors = append(res.Errors, fmt.Sprintf("line %d: importance or confidence out of range", line))
 			continue
 		}
-		res.Imported++
+		m := &store.Memory{
+			ID: actualID, Content: rec.Content, Type: rec.Type, Importance: importance,
+			Trust: tier, Confidence: rec.Confidence, Status: status, Scope: rec.Scope,
+			Source: rec.Source, SessionID: rec.SessionID, CreatedAt: created, UpdatedAt: updated,
+			LastConfirmedAt: confirmed, ContentHash: hash,
+		}
+		pending = append(pending, pendingImport{record: rec, line: line, memory: m, entities: entities})
 	}
-	return res, sc.Err()
+	if err := sc.Err(); err != nil {
+		return res, err
+	}
+
+	items := make([]store.ImportItem, 0, len(pending))
+	for _, item := range pending {
+		if item.record.SupersededBy != "" {
+			target, ok := idMap[item.record.SupersededBy]
+			if !ok {
+				var exists int
+				if err := s.DB.QueryRow(`SELECT COUNT(*) FROM memories WHERE id=?`, item.record.SupersededBy).Scan(&exists); err != nil {
+					return res, err
+				}
+				if exists == 0 {
+					res.Errors = append(res.Errors, fmt.Sprintf("line %d: superseded_by references unknown id %q", item.line, item.record.SupersededBy))
+					continue
+				}
+				target = item.record.SupersededBy
+			}
+			item.memory.SupersededBy = target
+		}
+		items = append(items, store.ImportItem{Memory: item.memory, Entities: item.entities, Tags: item.record.Tags, OriginalID: item.record.ID})
+	}
+	if len(res.Errors) > 0 {
+		return res, nil
+	}
+	if err := s.ImportBatch(items); err != nil {
+		return res, err
+	}
+	res.Imported = len(items)
+	return res, nil
+}
+
+func validImportStatus(status string) bool {
+	switch status {
+	case store.StatusActive, store.StatusAging, store.StatusQuarantined, store.StatusSuperseded, store.StatusTombstoned:
+		return true
+	default:
+		return false
+	}
+}
+
+func parseImportTime(value string, required bool) (time.Time, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		if required {
+			return time.Time{}, fmt.Errorf("required value is empty")
+		}
+		return time.Time{}, nil
+	}
+	parsed, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return parsed, nil
 }
