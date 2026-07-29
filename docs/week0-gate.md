@@ -1,8 +1,9 @@
 # Week 0 — validation gate (do not skip)
 
-Five working days, **no code**. The build is gated on this. (The code in
-this repo exists because the gate is assumed passed for the exercise;
-in a real launch you run the gate first.)
+Five working days. This product-validation gate has not been run. The current
+implementation and landing-page variants are engineering artifacts, not proof
+that the demand criteria below passed. Do not publish a launch-readiness or
+market-validation claim until the owner records the measured outcome here.
 
 ## What to run
 

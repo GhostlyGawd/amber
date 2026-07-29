@@ -43,12 +43,16 @@ The database and config are `0600`. Project stores (`./.amber/`) ship a
 lands in version control. Exports (plain text you reviewed) are what you
 commit.
 
-## Compliance primitives
+## Portability and deletion semantics
 
-- **Right to erasure**: `amber forget --entity "Alice Chen"` tombstones
-  every memory linked to a person.
+- **Reversible soft deletion**: `amber forget --entity "Alice Chen"`
+  tombstones every linked memory. Tombstoned content remains in SQLite,
+  including the operation journal, until a future physical-purge feature is
+  implemented. Do not treat `forget` as regulatory erasure or secure media
+  deletion.
 - **Portability**: `amber export` produces the open amber.v1 interchange
-  format.
+  format. Import validates the full stream and restores IDs, timestamps,
+  supersedence, entity aliases, and tags in one transaction.
 
 ## What leaves your machine
 
@@ -61,7 +65,9 @@ are:
 2. calling your configured digest LLM (`claude -p` locally, or an API you
    opted into) during `digest`;
 3. calling an embeddings endpoint **only** if you explicitly chose the
-   `openai-compat` provider.
+   `openai-compat` provider. Quarantined and tombstoned content is not sent for
+   embedding. Review approval can make a record active and eligible for
+   embedding.
 
 API keys are referenced by environment-variable name in config, never
 stored in the config file or the database.

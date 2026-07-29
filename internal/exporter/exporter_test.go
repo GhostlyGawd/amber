@@ -2,12 +2,14 @@ package exporter
 
 import (
 	"bytes"
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/ghostlygawd/amber/internal/store"
 	"github.com/ghostlygawd/amber/internal/trust"
+	"github.com/ghostlygawd/amber/internal/version"
 )
 
 func seed(t *testing.T) *store.Store {
@@ -49,14 +51,7 @@ func TestExportImportRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer dst.Close()
-	res, err := ImportJSONL(&buf, dst, func(rec Record) error {
-		m := &store.Memory{
-			Content: rec.Content, Type: rec.Type, Importance: rec.Importance,
-			Trust: trust.Tier(rec.Trust), Confidence: rec.Confidence, Status: rec.Status,
-			CreatedAt: mustTime(rec.CreatedAt), UpdatedAt: mustTime(rec.UpdatedAt),
-		}
-		return dst.Insert(m, nil, nil)
-	})
+	res, err := ImportJSONL(&buf, dst)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +61,7 @@ func TestExportImportRoundTrip(t *testing.T) {
 	// Idempotent: re-import skips all by content hash.
 	var buf2 bytes.Buffer
 	_ = WriteJSONL(&buf2, ms)
-	res2, err := ImportJSONL(&buf2, dst, func(rec Record) error { t.Fatal("must not insert"); return nil })
+	res2, err := ImportJSONL(&buf2, dst)
 	if err != nil || res2.Skipped != 3 {
 		t.Fatalf("re-import: %+v err=%v", res2, err)
 	}
@@ -118,4 +113,104 @@ func TestExportScanRedacts(t *testing.T) {
 func mustTime(s string) time.Time {
 	t, _ := time.Parse(time.RFC3339, s)
 	return t
+}
+
+func TestJSONLRoundTripPreservesGraphAliasesAndTimestamps(t *testing.T) {
+	src, err := store.Create(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer src.Close()
+
+	entity, err := src.EnsureEntity("Amber", "project")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := src.AddAlias(entity.ID, "amber-memory"); err != nil {
+		t.Fatal(err)
+	}
+	oldCreated := time.Date(2025, 1, 2, 3, 4, 5, 0, time.UTC)
+	oldUpdated := oldCreated.Add(2 * time.Hour)
+	newCreated := oldCreated.Add(24 * time.Hour)
+	newUpdated := newCreated.Add(3 * time.Hour)
+	newer := &store.Memory{
+		ID: store.NewID(), Content: "Amber uses SQLite WAL.", Type: "decision",
+		Trust: trust.T1, Confidence: 0.9, Importance: 5, Status: store.StatusActive,
+		Scope: "project", Source: "test", CreatedAt: newCreated, UpdatedAt: newUpdated,
+	}
+	older := &store.Memory{
+		ID: store.NewID(), Content: "Amber uses a JSON file.", Type: "decision",
+		Trust: trust.T0, Confidence: 0.8, Importance: 4, Status: store.StatusSuperseded,
+		Scope: "project", Source: "test", CreatedAt: oldCreated, UpdatedAt: oldUpdated,
+		SupersededBy: newer.ID,
+	}
+	for _, m := range []*store.Memory{older, newer} {
+		if err := src.Insert(m, []store.Entity{entity}, []string{"architecture"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	memories, err := Select(src, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var data bytes.Buffer
+	if err := WriteJSONL(&data, memories); err != nil {
+		t.Fatal(err)
+	}
+	dst, err := store.Create(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dst.Close()
+	result, err := ImportJSONL(&data, dst)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Imported != 2 || len(result.Errors) != 0 {
+		t.Fatalf("import result: %+v", result)
+	}
+
+	got, err := dst.Get(older.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.SupersededBy != newer.ID || !got.CreatedAt.Equal(oldCreated) || !got.UpdatedAt.Equal(oldUpdated) {
+		t.Fatalf("graph or timestamps changed: %+v", got)
+	}
+	if len(got.Entities) != 1 || len(got.Entities[0].Aliases) != 1 || got.Entities[0].Aliases[0] != "amber-memory" {
+		t.Fatalf("entity aliases changed: %+v", got.Entities)
+	}
+	if len(got.Tags) != 1 || got.Tags[0] != "architecture" {
+		t.Fatalf("tags changed: %v", got.Tags)
+	}
+}
+
+func TestImportRejectsInvalidTimestampAtomically(t *testing.T) {
+	dst, err := store.Create(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dst.Close()
+	record := Record{
+		Schema: version.InterchangeSchema, ID: store.NewID(), Content: "valid content",
+		Type: "note", Importance: 3, Trust: 0, Confidence: 1, Status: store.StatusActive,
+		CreatedAt: "not-a-time", UpdatedAt: time.Now().UTC().Format(time.RFC3339),
+	}
+	record.ContentHash = store.HashContent(record.Content)
+	var data bytes.Buffer
+	if err := json.NewEncoder(&data).Encode(record); err != nil {
+		t.Fatal(err)
+	}
+	result, err := ImportJSONL(&data, dst)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Errors) != 1 || result.Imported != 0 {
+		t.Fatalf("result: %+v", result)
+	}
+	memories, err := dst.List(store.ListFilter{})
+	if err != nil || len(memories) != 0 {
+		t.Fatalf("invalid import wrote memories: %d, err=%v", len(memories), err)
+	}
 }

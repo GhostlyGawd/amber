@@ -51,16 +51,15 @@ briefing — from one SQLite file you own and can take to any agent.
 
 ## Install
 
+Amber does not have a published binary or Homebrew release yet. Build the
+current command from source with Go 1.25 or newer:
+
 ```sh
-# one-line installer (macOS/Linux, arm64/x86)
-curl -fsSL https://raw.githubusercontent.com/ghostlygawd/amber/main/install.sh | sh
-
-# or Homebrew
-brew install ghostlygawd/tap/amber
-
-# or from source (Go 1.24+)
 go install github.com/ghostlygawd/amber/cmd/amber@latest
 ```
+
+The release installer remains in the repository for release validation. Do
+not use it until a tagged release with checksums is published.
 
 The binary is under 25 MB. The optional local embedding model is a
 separate ~30 MB download offered at `init`; without it, Amber runs on
@@ -174,7 +173,7 @@ anything else holding your context.
 | `amber browse` | TUI: search, filter, inspect; view chains and trust tiers |
 | `amber review` | Approve / edit / reject quarantined and auto-digested memories |
 | `amber show <id\|entity>` | Full record, or an entity dossier |
-| `amber forget <id \| --query \| --entity>` | Soft-delete (tombstone); `--entity` is the erasure primitive |
+| `amber forget <id \| --query \| --entity>` | Reversible soft deletion (tombstone), including all memories linked to an entity |
 | `amber digest [file] [--transcripts 30d]` | LLM extraction from a transcript or memory file |
 | `amber consolidate [--dry-run]` | Merge, resolve, absolutize dates, demote, re-index — never delete |
 | `amber serve` | MCP server (stdio) |
@@ -207,7 +206,9 @@ The pain-point → existing-solutions → gap map, with sources:
 [docs/decisions/DECISIONS.md](docs/decisions/DECISIONS.md), the threat
 model [docs/threat-model.md](docs/threat-model.md), and the extraction
 prompt is [published verbatim](docs/prompts/extract.md). Benchmarks are
-published with methodology, judge prompts, seeds, and losses.
+published with methodology, judge prompts, seeds, and losses. See
+[SECURITY.md](SECURITY.md) for private-reporting guidance and
+[CONTRIBUTING.md](CONTRIBUTING.md) for the Go 1.25 development checks.
 
 ## License
 

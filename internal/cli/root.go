@@ -80,12 +80,13 @@ func (e *policyError) Error() string { return e.msg }
 
 // env binds a command invocation to a resolved store + config + embedder.
 type env struct {
-	Dir      string
-	Scope    config.Scope
-	Store    *store.Store
-	Config   *config.Config
-	Embedder embed.Embedder
-	Writer   *writer.Writer
+	Dir               string
+	Scope             config.Scope
+	Store             *store.Store
+	Config            *config.Config
+	Embedder          embed.Embedder
+	MigrationEmbedder embed.Embedder
+	Writer            *writer.Writer
 }
 
 // openEnv resolves scope and opens the store. Commands that mutate or
@@ -109,6 +110,7 @@ func openEnv() (*env, error) {
 		return nil, err
 	}
 	e, err := embed.New(cfg)
+	configuredEmbedder := e
 	if err != nil {
 		// A broken embedder config must not brick the store: degrade to
 		// the BM25 floor with a warning on stderr.
@@ -127,7 +129,8 @@ func openEnv() (*env, error) {
 	}
 	return &env{
 		Dir: dir, Scope: scope, Store: s, Config: cfg, Embedder: e,
-		Writer: &writer.Writer{Store: s, Config: cfg, Embedder: e},
+		MigrationEmbedder: configuredEmbedder,
+		Writer:            &writer.Writer{Store: s, Config: cfg, Embedder: e},
 	}, nil
 }
 

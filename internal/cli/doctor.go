@@ -71,12 +71,12 @@ downloads the local embedding model.`,
 			var missing int
 			_ = e.Store.DB.QueryRow(`SELECT COUNT(*) FROM memories WHERE embedding IS NULL AND status IN ('active','aging')`).Scan(&missing)
 			switch {
-			case e.Embedder == nil:
+			case e.MigrationEmbedder == nil:
 				report(true, "embeddings", "BM25-only floor (no provider configured)")
 			case storeModel == "":
-				report(missing == memN || missing == 0, "embeddings", fmt.Sprintf("provider %s; %d rows missing vectors", e.Embedder.Name(), missing))
-			case storeModel != e.Embedder.Name():
-				report(false, "embeddings", fmt.Sprintf("store built with %s, config says %s — run `amber doctor --reembed`", storeModel, e.Embedder.Name()))
+				report(missing == memN || missing == 0, "embeddings", fmt.Sprintf("provider %s; %d rows missing vectors", e.MigrationEmbedder.Name(), missing))
+			case storeModel != e.MigrationEmbedder.Name():
+				report(false, "embeddings", fmt.Sprintf("store built with %s, config says %s — run `amber doctor --reembed`", storeModel, e.MigrationEmbedder.Name()))
 			default:
 				report(missing == 0, "embeddings", fmt.Sprintf("%s; %d rows missing vectors", storeModel, missing))
 			}
@@ -111,10 +111,10 @@ downloads the local embedding model.`,
 			}
 
 			if reembed {
-				if e.Embedder == nil {
+				if e.MigrationEmbedder == nil {
 					return fmt.Errorf("no embedding provider configured; set embedding.provider first")
 				}
-				fmt.Printf("\nre-embedding with %s…\n", e.Embedder.Name())
+				fmt.Printf("\nre-embedding with %s…\n", e.MigrationEmbedder.Name())
 				n, err := reembedAll(e)
 				if err != nil {
 					return err
@@ -143,12 +143,13 @@ func fiMode(fi os.FileInfo) any {
 }
 
 func reembedAll(e *env) (int, error) {
-	ms, err := e.Store.List(store.ListFilter{})
+	ms, err := e.Store.List(store.ListFilter{Statuses: []string{store.StatusActive, store.StatusAging}})
 	if err != nil {
 		return 0, err
 	}
 	n := 0
 	batch := make([]*store.Memory, 0, 64)
+	updates := make([]store.EmbeddingUpdate, 0, len(ms))
 	flush := func() error {
 		if len(batch) == 0 {
 			return nil
@@ -157,14 +158,12 @@ func reembedAll(e *env) (int, error) {
 		for i, m := range batch {
 			texts[i] = m.Content
 		}
-		vecs, err := e.Embedder.EmbedBatch(texts)
+		vecs, err := e.MigrationEmbedder.EmbedBatch(texts)
 		if err != nil {
 			return err
 		}
 		for i, m := range batch {
-			if err := e.Store.SetEmbedding(m.ID, vecs[i]); err != nil {
-				return err
-			}
+			updates = append(updates, store.EmbeddingUpdate{ID: m.ID, Vector: vecs[i]})
 			n++
 		}
 		batch = batch[:0]
@@ -181,12 +180,8 @@ func reembedAll(e *env) (int, error) {
 	if err := flush(); err != nil {
 		return n, err
 	}
-	if err := e.Store.SetMeta(store.MetaEmbeddingModel, e.Embedder.Name()); err != nil {
-		return n, err
-	}
-	_ = e.Store.SetMeta(store.MetaEmbeddingDims, fmt.Sprint(e.Embedder.Dims()))
-	_ = e.Store.AppendOp(store.OpReembed, "", map[string]any{"model": e.Embedder.Name(), "count": n})
-	return n, nil
+	err = e.Store.ReplaceEmbeddings(updates, e.MigrationEmbedder.Name(), e.MigrationEmbedder.Dims())
+	return n, err
 }
 
 func doFetchModel() error {

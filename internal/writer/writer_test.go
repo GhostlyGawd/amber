@@ -2,6 +2,7 @@ package writer
 
 import (
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/ghostlygawd/amber/internal/config"
@@ -46,7 +47,7 @@ func TestWriteCreateRecall(t *testing.T) {
 
 func TestDuplicateReconfirms(t *testing.T) {
 	w := newTestWriter(t)
-	a, err := w.Write(Input{Content: "The staging database is Postgres 16.", Type: "fact", Trust: trust.T0})
+	a, err := w.Write(Input{Content: "The staging database is Postgres 16.", Type: "fact", Trust: trust.T0, Tags: []string{"database"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,6 +57,9 @@ func TestDuplicateReconfirms(t *testing.T) {
 	}
 	if b.Action != "reconfirmed" || b.Memory.ID != a.Memory.ID {
 		t.Fatalf("expected reconfirm of %s, got %s of %s", a.Memory.ID, b.Action, b.Memory.ID)
+	}
+	if len(b.Memory.Tags) != 1 || b.Memory.Tags[0] != "database" {
+		t.Fatalf("reconfirmed memory lost tags: %v", b.Memory.Tags)
 	}
 	if n, _ := w.Store.CountByStatus(); n[store.StatusActive] != 1 {
 		t.Fatalf("expected 1 active, got %v", n)
@@ -116,6 +120,9 @@ func TestImperativeFromDigestQuarantined(t *testing.T) {
 		t.Fatalf("action = %s, want quarantined", out.Action)
 	}
 	if out.Memory.Status != store.StatusQuarantined || out.Memory.Trust != trust.T3 {
+		if len(out.Memory.Embedding) != 0 {
+			t.Fatal("quarantined content must not be sent to or stored by an embedder")
+		}
 		t.Fatalf("directive from digest must be quarantined T3, got %s %s", out.Memory.Status, out.Memory.Trust)
 	}
 }
@@ -249,5 +256,66 @@ func TestScannerCatalog(t *testing.T) {
 	}
 	if fs := scan.Scan("User prefers tabs over spaces for Go code."); len(fs) != 0 {
 		t.Errorf("false positive on clean text: %v", fs)
+	}
+}
+
+func TestConcurrentDuplicateWritesCommitOneMemory(t *testing.T) {
+	w := newTestWriter(t)
+	const writers = 24
+	start := make(chan struct{})
+	errs := make(chan error, writers)
+	actions := make(chan string, writers)
+	var group sync.WaitGroup
+	for range writers {
+		group.Add(1)
+		go func() {
+			defer group.Done()
+			<-start
+			out, err := w.Write(Input{
+				Content: "the staging database uses postgres 16.",
+				Type:    "fact", Trust: trust.T0, Entities: []string{"Amber"}, SkipScan: true,
+			})
+			if err != nil {
+				errs <- err
+				return
+			}
+			actions <- out.Action
+		}()
+	}
+	close(start)
+	group.Wait()
+	close(errs)
+	close(actions)
+	for err := range errs {
+		t.Errorf("concurrent write: %v", err)
+	}
+	created := 0
+	reconfirmed := 0
+	for action := range actions {
+		switch action {
+		case "created":
+			created++
+		case "reconfirmed":
+			reconfirmed++
+		default:
+			t.Errorf("unexpected action %q", action)
+		}
+	}
+	if created != 1 || reconfirmed != writers-1 {
+		t.Fatalf("created=%d reconfirmed=%d, want 1 and %d", created, reconfirmed, writers-1)
+	}
+	memories, err := w.Store.List(store.ListFilter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(memories) != 1 {
+		t.Fatalf("stored %d duplicate memories, want 1", len(memories))
+	}
+	entities, err := w.Store.ListEntities("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entities) != 1 {
+		t.Fatalf("stored %d duplicate entities, want 1", len(entities))
 	}
 }

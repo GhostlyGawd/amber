@@ -6,12 +6,10 @@ one SQLite file, no key, no account.
 
 ## Install Amber (agent-safe, non-interactive)
 
-```sh
-# macOS / Linux
-curl -fsSL https://raw.githubusercontent.com/ghostlygawd/amber/main/install.sh | sh
-# or, if Go is available
-go install github.com/ghostlygawd/amber/cmd/amber@latest
+Amber has no published binary release yet. Go 1.25 or newer is required.
 
+```sh
+go install github.com/ghostlygawd/amber/cmd/amber@latest
 amber init --defaults          # non-interactive: BM25 floor, review-first, telemetry off
 ```
 

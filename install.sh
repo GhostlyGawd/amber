@@ -59,7 +59,7 @@ if curl -fsSL "$base/checksums.txt" -o "$tmp/checksums.txt" 2>/dev/null; then
   ( cd "$tmp" && grep " $archive\$" checksums.txt | (sha256sum -c - 2>/dev/null || shasum -a 256 -c -) ) \
     || die "checksum verification failed"
 else
-  info "warning: checksums.txt not found; skipping verification"
+  die "checksums.txt not found; refusing unverified release"
 fi
 
 tar -xzf "$tmp/$archive" -C "$tmp"

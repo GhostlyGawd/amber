@@ -3,15 +3,11 @@ package cli
 import (
 	"fmt"
 	"os"
-	"strings"
-	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/ghostlygawd/amber/internal/exporter"
 	"github.com/ghostlygawd/amber/internal/store"
-	"github.com/ghostlygawd/amber/internal/trust"
-	"github.com/ghostlygawd/amber/internal/writer"
 )
 
 func cmdExport() *cobra.Command {
@@ -111,34 +107,7 @@ commits an export, you review the diff in the PR, then import.`,
 			}
 			defer f.Close()
 
-			res, err := exporter.ImportJSONL(f, e.Store, func(rec exporter.Record) error {
-				t := trust.Tier(rec.Trust)
-				if !t.Valid() {
-					return fmt.Errorf("bad trust tier %d", rec.Trust)
-				}
-				status := rec.Status
-				switch status {
-				case "", store.StatusActive, store.StatusAging, store.StatusQuarantined, store.StatusSuperseded, store.StatusTombstoned:
-				default:
-					return fmt.Errorf("bad status %q", status)
-				}
-				var entities []string
-				for _, en := range rec.Entities {
-					entities = append(entities, en.Name)
-				}
-				out, err := e.Writer.Write(writer.Input{
-					Content: rec.Content, Type: rec.Type, Importance: rec.Importance,
-					Trust: t, Scope: string(e.Scope), Source: "import:" + args[0],
-					SessionID: rec.SessionID, Entities: entities, Tags: rec.Tags,
-					CreatedAt: parseRFC3339(rec.CreatedAt), LastConfirmedAt: parseRFC3339(rec.LastConfirmedAt),
-					Confidence: rec.Confidence, Status: status,
-				})
-				if err != nil {
-					return err
-				}
-				_ = e.Store.AppendOp(store.OpImport, out.Memory.ID, map[string]any{"file": args[0], "orig_id": rec.ID})
-				return nil
-			})
+			res, err := exporter.ImportJSONL(f, e.Store)
 			if err != nil {
 				return err
 			}
@@ -154,15 +123,4 @@ commits an export, you review the diff in the PR, then import.`,
 		},
 	}
 	return c
-}
-
-func parseRFC3339(s string) time.Time {
-	if s == "" {
-		return time.Time{}
-	}
-	t, err := time.Parse(time.RFC3339, strings.TrimSpace(s))
-	if err != nil {
-		return time.Time{}
-	}
-	return t
 }

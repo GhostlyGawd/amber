@@ -58,10 +58,18 @@ write — mixed-model stores are refused at open), `embedding_dims`,
 
 ## Concurrency
 
-`BEGIN IMMEDIATE` (via `_txlock=immediate`) wraps every check-and-write,
-so multiple agents or panes on one machine share a store safely. WAL +
-`busy_timeout=5000` handle contention; worst case a race degrades to a
-flagged ambiguity, never data loss.
+`BEGIN IMMEDIATE` (via `_txlock=immediate`) wraps belief adjudication and its
+write in one transaction. The same transaction includes insert or reconfirm,
+supersedence, flags, operation-journal entries, and first-write embedding-model
+pinning. Multiple agents or panes therefore cannot decide against the same
+stale candidate snapshot. WAL and `busy_timeout=5000` handle contention.
+
+`amber doctor --reembed` computes replacement vectors only for active and
+aging memories. It then replaces those vectors, clears non-searchable vectors,
+pins the new model and dimensions, and journals the migration in one
+transaction. JSONL import also validates the complete input before one
+transaction restores records, timestamps, supersedence, entity aliases, and
+tags.
 
 ## Sidecar
 

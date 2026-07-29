@@ -13,6 +13,6 @@
 - [Naming (F4)](naming.md) — why "Amber" is provisional.
 - [Week 0 gate](week0-gate.md) — the validation gate before code.
 
-The build spec these implement is the master document. The strategy,
-competitive, customer, and GTM context live there; this directory is the
-engineering-facing subset plus the launch-critical public artifacts.
+The decision log defines the implemented product choices. Positioning and the
+problem map define public claims and their evidence. This directory also holds
+the engineering references and pre-launch validation gate.
