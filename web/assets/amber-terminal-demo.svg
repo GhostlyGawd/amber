@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="1060" viewBox="0 0 1280 1060" role="img" aria-labelledby="title description">
+  <title id="title">Amber command-line demonstration</title>
+  <description id="description">A sanitized terminal transcript shows Amber initialization, one reviewed memory write, attributed recall, and local store status.</description>
+  <rect width="1280" height="1060" rx="18" fill="#0d1117"/>
+  <rect width="1280" height="58" rx="18" fill="#161b22"/>
+  <rect y="40" width="1280" height="18" fill="#161b22"/>
+  <circle cx="30" cy="29" r="7" fill="#ff5f56"/>
+  <circle cx="54" cy="29" r="7" fill="#ffbd2e"/>
+  <circle cx="78" cy="29" r="7" fill="#27c93f"/>
+  <text x="640" y="35" text-anchor="middle" fill="#8b949e" font-family="Cascadia Code, SFMono-Regular, Consolas, Liberation Mono, monospace" font-size="15">amber · local-first memory demo · d635a31c</text>
+
+  <g font-family="Cascadia Code, SFMono-Regular, Consolas, Liberation Mono, monospace" font-size="16">
+    <text x="34" y="90" fill="#58a6ff">$ amber --version</text>
+    <text x="34" y="116" fill="#e6edf3">amber version 0.1.0-dev (commit d635a31c, built 2026-07-29T05:21:46Z)</text>
+    <text x="34" y="158" fill="#58a6ff">$ amber init --defaults</text>
+    <text x="34" y="184" fill="#e6edf3">embedding: BM25-only floor (run `amber doctor --fetch-model` for semantic recall)</text>
+    <text x="34" y="210" fill="#e6edf3">store ready: ~/.amber/amber.db</text>
+    <text x="34" y="236" fill="#e6edf3">embedding: none · digest posture: review-first</text>
+    <text x="34" y="278" fill="#8b949e">next steps:</text>
+    <text x="54" y="304" fill="#c9d1d9">amber remember "first fact"     store a memory</text>
+    <text x="54" y="330" fill="#c9d1d9">amber digest --transcripts 30d   build a store from your Claude Code history</text>
+    <text x="54" y="356" fill="#c9d1d9">amber hooks install              wire into Claude Code sessions</text>
+    <text x="34" y="398" fill="#58a6ff">$ amber remember "Deploy production through a reviewed pull request." --type decision --importance 4</text>
+    <text x="34" y="424" fill="#3fb950">remembered 7pgsc364 [decision T0]: Deploy production through a reviewed pull request.</text>
+    <text x="34" y="466" fill="#58a6ff">$ amber recall "How do we deploy production?" --why</text>
+    <text x="34" y="492" fill="#e6edf3"> 1. 7pgsc364  decision   T0  Deploy production through a reviewed pull request.</text>
+    <text x="34" y="518" fill="#8b949e">    why: lexical #1 (bm25 0.00), rrf 0.0164, ×imp 1.00 ×trust 1.00 ×recency 1.00 ×conf 1.00</text>
+    <text x="34" y="560" fill="#58a6ff">$ amber status</text>
+    <text x="34" y="586" fill="#e6edf3">store       ~/.amber (global scope)</text>
+    <text x="34" y="612" fill="#e6edf3">memories    1 total — 1 active, 0 aging, 0 superseded, 0 quarantined, 0 tombstoned</text>
+    <text x="34" y="638" fill="#e6edf3">types       fact 0 · preference 0 · decision 1 · event 0 · note 0</text>
+    <text x="34" y="664" fill="#e6edf3">trust       T0 1 · T1 0 · T2 0 · T3 0</text>
+    <text x="34" y="690" fill="#e6edf3">entities    0</text>
+    <text x="34" y="716" fill="#e6edf3">embedding   none (BM25-only lexical floor)</text>
+    <text x="34" y="742" fill="#e6edf3">digest      backend auto, posture review-first</text>
+    <text x="34" y="768" fill="#e6edf3">review      inbox empty</text>
+    <text x="34" y="794" fill="#e6edf3">injection   budget 700 tokens; no injections recorded yet</text>
+    <text x="34" y="820" fill="#e6edf3">telemetry   off (zero telemetry)</text>
+  </g>
+  <line x1="34" y1="872" x2="1246" y2="872" stroke="#30363d"/>
+  <text x="34" y="910" fill="#8b949e" font-family="Cascadia Code, SFMono-Regular, Consolas, Liberation Mono, monospace" font-size="15">Recorded from merged main on 2026-07-29. Private scratch paths were replaced with ~/.amber.</text>
+  <text x="34" y="938" fill="#8b949e" font-family="Cascadia Code, SFMono-Regular, Consolas, Liberation Mono, monospace" font-size="15">The plain-text transcript and capture provenance are stored beside this visual.</text>
+</svg>

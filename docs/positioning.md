@@ -108,15 +108,16 @@ Before any sentence ships, it must pass all three:
 - **Wedge (now):** individual developers living in Claude Code /
   Cursor / Codex daily — feeling P1 weekly and P2 already.
 - **Business (later):** teams, where P3 becomes governance — shared
-  reviewed memory, provenance, poisoning defenses. Per
-  [week0-gate.md](week0-gate.md): the team tier is the business;
-  security is how we earn the right to sell it.
+  reviewed memory, provenance, and poisoning defenses. This remains a future
+  option. Current work focuses on helping individual developers understand and
+  adopt the source product.
 
 ## Status of validation (kept honest, updated as evidence arrives)
 
-The pains above are grounded in public demand threads and the cited
-study; the **willingness to adopt this solution is not yet
-proven**. The gate in [week0-gate.md](week0-gate.md) (landing-page
-conversion + 10 unprompted-pain interviews, with kill criteria)
-remains the test before scaling GTM spend. The cited-evidence map
-lives in [problem-map.md](problem-map.md).
+The pains above are grounded in public demand threads and the cited study; the
+**willingness to adopt this solution is not yet proven**. The current
+[acquisition loop](week0-gate.md) improves the source product and landing page,
+then records real adoption signals as dated evidence. Formal interviews are
+deferred and optional. Repository traffic, clones, stars, and issues are
+directional signals, not proof of users or validated demand. The cited-evidence
+map lives in [problem-map.md](problem-map.md).

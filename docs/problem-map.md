@@ -130,16 +130,14 @@ it doesn't.
 1. **Verbatim user complaints.** No Reddit/HN/issue-thread quote
    survived adversarial verification in this pass. The complaint
    *categories* are validated by vendor admissions, measurements, and
-   incidents above — but the quotable voice-of-user evidence is
-   pending. The Week-0 interviews ([week0-gate.md](week0-gate.md))
-   are that collection pass; source them from the verified-live
-   threads (#23544, #23750, #34776, #56793). Issue #38536, cited in
-   earlier planning, did not surface in verification — confirm it
-   exists before citing it again.
-2. **Willingness to adopt.** Pains being real does not prove people
-   will install a tool for them. The landing-page conversion and
-   unprompted-pain interview gates in week0-gate.md remain the test,
-   with kill criteria unchanged.
+   incidents above, but quotable voice-of-user evidence remains absent.
+   Qualitative feedback can be collected asynchronously from actual users.
+   Formal interviews are deferred. Issue #38536, cited in earlier planning,
+   did not surface in verification — confirm it exists before citing it again.
+2. **Willingness to adopt.** Pains being real does not prove people will install
+   a tool for them. The current [acquisition loop](week0-gate.md) improves the
+   source product and records dated adoption signals. Traffic and clones remain
+   directional until direct evidence identifies actual users.
 3. **That Amber's reviewed injection improves outcomes.** Unproven by
    design — we ship the instrument, not the claim.
 4. **Scope of "local-first."** It means storage, recall, and review

@@ -1,6 +1,6 @@
 # Decisions
 
-The build-spec decision log (D1–D18) and the founder register (F1–F4).
+The build-spec decision log (D1–D18) and the founder register (F1–F5).
 This is a hand-maintained ADR; `amber export --format decisions`
 generates the *runtime* DECISIONS.md from decision-type memories in a
 store — a different artifact for a different purpose.
@@ -33,9 +33,10 @@ store — a different artifact for a different purpose.
 | # | Decision | Recommendation on file |
 |---|---|---|
 | **F1** | Endgame | **Bootstrap-first, option-preserving.** Decide at first inflection (~5k installs or first hard team pull) |
-| **F2** | Kill-criteria sign-off | Approve Week-0 numbers as written before any code |
+| **F2** | Kill-criteria sign-off | Historical Week-0 gate; superseded by F5 on 2026-07-29 |
 | **F3** | Trust posture default | **Review-first for a store's first two weeks, then offer auto.** Teach control, then earn invisibility |
 | **F4** | Name | **Rename before launch.** See [naming.md](../naming.md) |
+| **F5** | Validation sequence | **Optimize the page and product, then seek actual users.** Required interviews and calls are deferred |
 
 ## Consciously rejected for v1
 
