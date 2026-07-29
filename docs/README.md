@@ -12,6 +12,7 @@
 - [Consolidation](consolidate.md) — the never-delete maintenance pass.
 - [Naming (F4)](naming.md) — why "Amber" is provisional.
 - [Week 0 gate](week0-gate.md) — the validation gate before code.
+- [Terminal demo and current Week 0 evidence](evidence/2026-07-29-week0-and-terminal-demo-workpad.md) — recorded CLI output, provenance, and the still-open external gate.
 
 The decision log defines the implemented product choices. Positioning and the
 problem map define public claims and their evidence. This directory also holds
