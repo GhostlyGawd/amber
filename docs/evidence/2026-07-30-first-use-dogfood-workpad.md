@@ -15,8 +15,7 @@ ongoing product objective.
 
 Evidence destination: this workpad.
 
-Terminal action: `mark-ready` after clean-path validation and pull-request CI
-pass.
+Terminal action: `keep-draft` for owner review after pull-request CI passes.
 
 ## Alignment
 
