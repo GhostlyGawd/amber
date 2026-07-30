@@ -58,6 +58,10 @@ current command from source with Go 1.25 or newer:
 go install github.com/ghostlygawd/amber/cmd/amber@latest
 ```
 
+A cold source build can take several minutes because Go compiles Amber and its
+dependencies locally. Go puts the command in `$(go env GOPATH)/bin`; make
+sure that directory is on `PATH` before running `amber`.
+
 The release installer remains in the repository for release validation. Do
 not use it until a tagged release with checksums is published.
 
@@ -68,10 +72,12 @@ exact + BM25 lexical recall (the "floor").
 ## Two minutes to your first memory
 
 ```sh
-amber init                      # create ~/.amber, set up embeddings
+amber init --defaults           # BM25 floor, review-first, telemetry off, no prompts
 amber remember "We deploy the billing service to Fly.io on Fridays" --type decision
 amber recall "where does billing deploy"
 ```
+
+Upgrade to semantic recall later with `amber doctor --fetch-model`.
 
 ![Sanitized Amber terminal demonstration showing initialization, a reviewed memory write, attributed recall, and local store status](web/assets/amber-terminal-demo.svg)
 

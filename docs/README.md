@@ -13,6 +13,7 @@
 - [Naming (F4)](naming.md) — why "Amber" is provisional.
 - [Early user acquisition](week0-gate.md) — the active product-and-page loop; formal interviews are deferred.
 - [Acquisition and terminal-demo evidence](evidence/2026-07-29-week0-and-terminal-demo-workpad.md) — recorded CLI output, landing-page audit, provenance, and the dated acquisition baseline.
+- [First-use dogfood evidence](evidence/2026-07-30-first-use-dogfood-workpad.md) — clean source install, command discovery, initialization, and first recall.
 
 The decision log defines the implemented product choices. Positioning and the
 problem map define public claims and their evidence. This directory also holds

@@ -66,6 +66,7 @@
     flex: none; font-size: 12px; border: 1px solid var(--rule); background: var(--paper);
     color: var(--faint); border-radius: 6px; min-height: 36px; padding: 6px 10px; cursor: pointer;
   }
+  .installnote { margin: 8px 0 0; color: var(--faint); font-size: 13px; }
   .frame { font-size: 17px; margin: 34px 0; padding: 18px 22px; border-left: 3px solid var(--amber); background: var(--paper); border-radius: 0 6px 6px 0; }
   .frame b { color: var(--amber); font-weight: 600; }
   pre { background: var(--code-bg); border: 1px solid var(--rule); border-radius: 8px; padding: 16px 18px; overflow-x: auto; font-size: 14.5px; }
@@ -122,6 +123,7 @@
       <code id="install-cmd">go install github.com/ghostlygawd/amber/cmd/amber@latest</code>
       <button id="copy-install" type="button" aria-label="Copy install command" aria-live="polite">copy</button>
     </div>
+    <p class="installnote">A cold source build can take a few minutes. If <span class="mono">amber</span> is not found, add <span class="mono">$(go env GOPATH)/bin</span> to <span class="mono">PATH</span>.</p>
   </header>
 
   <h2>The problem</h2>
@@ -153,7 +155,7 @@
   </div>
 
   <h2 id="quickstart">Two minutes to your first memory</h2>
-  <pre class="mono"><span class="p">amber</span> init
+  <pre class="mono"><span class="p">amber</span> init --defaults
 <span class="p">amber</span> remember "We deploy billing to Fly.io on Fridays" --type decision
 <span class="p">amber</span> recall "where does billing deploy"
 
